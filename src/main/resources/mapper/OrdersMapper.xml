@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lwf.mapper.OrdersMapper">
+    <!-- 通用查询映射结果 -->
+    <resultMap id="BaseResultMap" type="com.lwf.entity.Orders">
+        <id column="id" property="id" />
+        <result column="order_id" property="orderId" />
+        <result column="product_id" property="productId" />
+        <result column="user_id" property="userId" />
+        <result column="user_address" property="userAddress" />
+        <result column="merchant_id" property="merchantId" />
+        <result column="product_name" property="productName" />
+        <result column="amount" property="amount" />
+        <result column="type" property="type" />
+        <result column="status" property="status" />
+        <result column="receive_status" property="receiveStatus" />
+        <result column="tx_hash" property="txHash" />
+        <result column="description" property="description" />
+        <result column="created_at" property="createdAt" />
+        <result column="updated_at" property="updatedAt" />
+    </resultMap>
+
+    <!-- 通用查询结果列 -->
+    <sql id="Base_Column_List">
+        id, order_id, product_id, user_id, user_address, merchant_id, product_name, amount,
+        type, status, receive_status, tx_hash, description, created_at, updated_at
+    </sql>
+
+    <!-- 获取用户订单列表 -->
+    <select id="selectByUserAddress" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM orders
+        WHERE user_address = #{userAddress}
+        ORDER BY created_at DESC
+    </select>
+
+    <!-- 获取商家订单列表 -->
+    <select id="selectByMerchantId" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM orders
+        WHERE merchant_id = #{merchantId}
+        ORDER BY created_at DESC
+    </select>
+
+    <!-- 根据订单号查询 -->
+    <select id="selectByOrderId" parameterType="java.lang.String" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM orders
+        WHERE order_id = #{orderId}
+    </select>
+
+    <!-- 根据交易哈希查询 -->
+    <select id="selectByTxHash" parameterType="java.lang.String" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM orders
+        WHERE tx_hash = #{txHash}
+    </select>
+
+    <!-- 更新订单状态 -->
+    <update id="updateOrderStatus">
+        UPDATE orders
+        SET status = #{status}, updated_at = NOW()
+        WHERE order_id = #{orderId}
+    </update>
+
+    <!-- 确认收货 -->
+    <update id="confirmReceipt">
+        UPDATE orders
+        SET receive_status = 'confirmed', updated_at = NOW()
+        WHERE order_id = #{orderId} AND user_address = #{userAddress}
+    </update>
+
+    <!-- 获取订单统计信息 -->
+    <select id="selectOrderStats" resultType="java.util.Map">
+        SELECT
+        COUNT(*) as total_orders,
+        SUM(amount) as total_amount,
+        COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_orders,
+        COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_orders,
+        COUNT(CASE WHEN status = 'cancelled' THEN 1 END) as cancelled_orders
+        FROM orders
+        <where>
+            <if test="merchantId != null">
+                AND merchant_id = #{merchantId}
+            </if>
+            <if test="userAddress != null">
+                AND user_address = #{userAddress}
+            </if>
+        </where>
+    </select>
+
+    <!-- 获取最近订单 -->
+    <select id="selectRecentOrders" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM orders
+        ORDER BY created_at DESC
+        LIMIT #{limit}
+    </select>
+</mapper>

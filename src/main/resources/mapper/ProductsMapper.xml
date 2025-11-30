@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lwf.mapper.ProductsMapper">
+    <!-- 通用查询映射结果 -->
+    <resultMap id="BaseResultMap" type="com.lwf.entity.Products">
+        <id column="id" property="id" />
+        <result column="merchant_id" property="merchantId" />
+        <result column="merchant_address" property="merchantAddress" />
+        <result column="name" property="name" />
+        <result column="description" property="description" />
+        <result column="price" property="price" />
+        <result column="image" property="image" />
+        <result column="images" property="images" />
+        <result column="specs" property="specs" />
+        <result column="rating" property="rating" />
+        <result column="sales" property="sales" />
+        <result column="stock" property="stock" />
+        <result column="status" property="status" />
+        <result column="created_at" property="createdAt" />
+        <result column="updated_at" property="updatedAt" />
+    </resultMap>
+
+    <!-- 通用查询结果列 -->
+    <sql id="Base_Column_List">
+        id, merchant_id, merchant_address, name, description, price, image, images, specs,
+        rating, sales, stock, status, created_at, updated_at
+    </sql>
+
+    <!-- 商品搜索查询 -->
+    <select id="selectProductList" parameterType="com.lwf.entity.dto.ProductQueryDTO" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM products
+        WHERE status = 'approved'
+        <if test="keyword != null and keyword != ''">
+            AND (name LIKE CONCAT('%', #{keyword}, '%') OR description LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        <if test="sortBy == 'price'">
+            ORDER BY price
+            <choose>
+                <when test="sortOrder == 'asc'">ASC</when>
+                <otherwise>DESC</otherwise>
+            </choose>
+        </if>
+        <if test="sortBy != 'price'">
+            ORDER BY created_at DESC
+        </if>
+    </select>
+
+    <!-- 获取商家商品列表 -->
+    <select id="selectByMerchantAddress" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM products
+        WHERE merchant_address = #{merchantAddress}
+        ORDER BY
+        <choose>
+            <when test="sortBy != null and sortBy != ''">
+                <choose>
+                    <when test="sortBy == 'price'">price</when>
+                    <when test="sortBy == 'sales'">sales</when>
+                    <when test="sortBy == 'rating'">rating</when>
+                    <otherwise>created_at</otherwise>
+                </choose>
+                <choose>
+                    <when test="sortOrder == 'asc'">ASC</when>
+                    <otherwise>DESC</otherwise>
+                </choose>
+            </when>
+            <otherwise>
+                created_at DESC
+            </otherwise>
+        </choose>
+    </select>
+
+    <!-- 获取待审核商品 -->
+    <select id="selectPendingProducts" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM products
+        WHERE status = 'pending'
+        ORDER BY created_at DESC
+    </select>
+
+    <!-- 更新商品评分 -->
+    <update id="updateProductRating">
+        UPDATE products
+        SET rating = #{rating}, updated_at = NOW()
+        WHERE id = #{productId}
+    </update>
+
+    <!-- 增加商品销量 -->
+    <update id="incrementSales">
+        UPDATE products
+        SET sales = sales + #{quantity}, updated_at = NOW()
+        WHERE id = #{productId}
+    </update>
+
+    <!-- 减少商品库存 -->
+    <update id="decrementStock">
+        UPDATE products
+        SET stock = stock - #{quantity}, updated_at = NOW()
+        WHERE id = #{productId} AND stock >= #{quantity}
+    </update>
+
+    <!-- 获取商品统计信息 -->
+    <select id="selectProductStats" resultType="java.util.Map">
+        SELECT
+            COUNT(*) as total_products,
+            COUNT(CASE WHEN status = 'approved' THEN 1 END) as approved_products,
+            COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_products,
+            SUM(sales) as total_sales,
+            AVG(rating) as avg_rating
+        FROM products
+    </select>
+
+</mapper>

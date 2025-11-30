@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.lwf.mapper.ReviewsMapper">
+    <!-- 通用查询映射结果 -->
+    <resultMap id="BaseResultMap" type="com.lwf.entity.Reviews">
+        <id column="id" property="id" />
+        <result column="product_id" property="productId" />
+        <result column="user_id" property="userId" />
+        <result column="user_address" property="userAddress" />
+        <result column="rating" property="rating" />
+        <result column="content" property="content" />
+        <result column="ipfs_cid" property="ipfsCid" />
+        <result column="images" property="images" />
+        <result column="nft_id" property="nftId" />
+        <result column="helpful_votes" property="helpfulVotes" />
+        <result column="unhelpful_votes" property="unhelpfulVotes" />
+        <result column="verified" property="verified" />
+        <result column="tx_hash" property="txHash" />
+        <result column="created_at" property="createdAt" />
+    </resultMap>
+
+    <!-- 通用查询结果列 -->
+    <sql id="Base_Column_List">
+        id, product_id, user_id, user_address, rating, content, ipfs_cid, images, nft_id,
+        helpful_votes, unhelpful_votes, verified, tx_hash, created_at
+    </sql>
+
+    <!-- 获取商品评价列表 -->
+    <select id="selectByProductId" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM reviews
+        WHERE product_id = #{productId}
+        ORDER BY
+        <choose>
+            <when test="sortBy == 'helpful'">
+                helpful_votes DESC, created_at DESC
+            </when>
+            <when test="sortBy == 'rating'">
+                rating DESC, created_at DESC
+            </when>
+            <otherwise>
+                created_at DESC
+            </otherwise>
+        </choose>
+    </select>
+
+    <!-- 获取用户评价列表 -->
+    <select id="selectByUserAddress" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM reviews
+        WHERE user_address = #{userAddress}
+        ORDER BY created_at DESC
+    </select>
+
+    <!-- 检查用户是否已评价商品 -->
+    <select id="existsByUserIdAndProductId" resultType="java.lang.Boolean">
+        SELECT COUNT(*) > 0
+        FROM reviews
+        WHERE user_id = #{userId} AND product_id = #{productId}
+    </select>
+
+    <!-- 获取商品平均评分 -->
+    <select id="selectAverageRatingByProductId" resultType="java.lang.Double">
+        SELECT AVG(rating)
+        FROM reviews
+        WHERE product_id = #{productId}
+    </select>
+
+    <!-- 获取评价统计信息 -->
+    <select id="selectReviewStats" resultType="java.util.Map">
+        SELECT
+            COUNT(*) as total_reviews,
+            AVG(rating) as avg_rating,
+            COUNT(CASE WHEN rating = 5 THEN 1 END) as five_star,
+            COUNT(CASE WHEN rating = 4 THEN 1 END) as four_star,
+            COUNT(CASE WHEN rating = 3 THEN 1 END) as three_star,
+            COUNT(CASE WHEN rating = 2 THEN 1 END) as two_star,
+            COUNT(CASE WHEN rating = 1 THEN 1 END) as one_star
+        FROM reviews
+        WHERE product_id = #{productId}
+    </select>
+
+    <!-- 更新评价投票数 -->
+    <update id="updateVotes">
+        UPDATE reviews
+        SET
+            helpful_votes = #{helpfulVotes},
+            unhelpful_votes = #{unhelpfulVotes}
+        WHERE id = #{reviewId}
+    </update>
+
+    <!-- 获取热门评价（按有用投票排序） -->
+    <select id="selectTopHelpfulReviews" resultMap="BaseResultMap">
+        SELECT
+        <include refid="Base_Column_List" />
+        FROM reviews
+        WHERE product_id = #{productId}
+        ORDER BY helpful_votes DESC
+        LIMIT #{limit}
+    </select>
+
+</mapper>
