@@ -76,6 +76,19 @@
         </div>
       </el-card>
     </div>
+    <!-- 订单详情弹窗 -->
+    <el-dialog v-model="detailVisible" title="订单详情" width="600px">
+      <el-descriptions :column="2" border>
+        <el-descriptions-item label="订单号">{{ currentOrder.orderId }}</el-descriptions-item>
+        <el-descriptions-item label="商品">{{ currentOrder.productName }}</el-descriptions-item>
+        <el-descriptions-item label="金额">¥{{ currentOrder.amount }}</el-descriptions-item>
+        <el-descriptions-item label="状态">
+          <el-tag :type="getStatusType(currentOrder.status)">{{ getStatusText(currentOrder.status) }}</el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="交易哈希">{{ currentOrder.txHash }}</el-descriptions-item>
+        <el-descriptions-item label="创建时间">{{ formatTime(currentOrder.createdAt) }}</el-descriptions-item>
+      </el-descriptions>
+    </el-dialog>
   </div>
 </template>
 
@@ -84,6 +97,12 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getUserTransactions } from '@/api/transactionApi'
+import { useUserStore } from '@/stores/userStore'   // ← 引入
+const userStore = useUserStore()                    // ← 实例化
+
+const detailVisible = ref(false)
+const currentOrder = ref({})
+
 
 const router = useRouter()
 
@@ -93,12 +112,18 @@ const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
 
+function handleViewDetail(row) {
+  currentOrder.value = row
+  detailVisible.value = true
+}
+
 // 加载交易记录
 async function loadTransactions() {
   loading.value = true
   
   try {
     const data = await getUserTransactions({
+      userAddress: userStore.walletAddress,
       page: currentPage.value,
       pageSize: pageSize.value
     })
@@ -161,10 +186,10 @@ function handleConfirmReceive(row) {
 }
 
 // 查看详情
-function handleViewDetail(row) {
-  // 可以打开详情对话框
-  console.log('查看详情:', row)
-}
+// function handleViewDetail(row) {
+//   // 可以打开详情对话框
+//   console.log('查看详情:', row)
+// }
 
 // 分页改变
 function handlePageChange() {

@@ -190,6 +190,11 @@ async function loadProductDetail() {
   
   try {
     const data = await getProductDetail(route.params.id)
+    // product.value = data
+    // productStore.setCurrentProduct(data)
+    //
+    if (typeof data.specs === 'string') data.specs = JSON.parse(data.specs)
+    if (typeof data.images === 'string') data.images = JSON.parse(data.images)
     product.value = data
     productStore.setCurrentProduct(data)
     

@@ -183,17 +183,16 @@ async function handleSubmit() {
   submitting.value = true
   
   try {
-    const formData = new FormData()
-    formData.append('productId', route.params.productId)
-    formData.append('rating', reviewForm.value.rating)
-    formData.append('content', reviewForm.value.content)
-    
-    // 添加图片
-    fileList.value.forEach((file, index) => {
-      formData.append(`images[${index}]`, file.raw || file)
-    })
+    /* === ① 构造普通对象，不再用 FormData === */
+    const payload = {
+      productId: Number(route.params.productId),
+      rating: reviewForm.value.rating,
+      content: reviewForm.value.content.trim(),
+      /* 图片可选：先传 url 数组，后续再支持上传文件 */
+      images: JSON.stringify(fileList.value.map(f => f.url).filter(Boolean))
+    }
 
-    const result = await submitReview(formData)
+    const result = await submitReview(payload)
     
     ElMessage.success('评价提交成功')
     
