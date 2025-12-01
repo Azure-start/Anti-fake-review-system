@@ -42,6 +42,13 @@ export function getRewardHistory(params = {}) {
     params
   })
 }
+export function getUserReviews(params = {}) {
+  return request({
+    url: '/reviews/user',
+    method: 'get',
+    params
+  })
+}
 
 /**
  * 兑换优惠券
