@@ -67,17 +67,15 @@ const total = ref(0)
 // 加载用户列表
 async function loadUsers() {
   loading.value = true
-  
   try {
     const result = await getUserList({
       page: currentPage.value,
       pageSize: pageSize.value
     })
-    
-    if (result.code === 0) {
-      users.value = result.data.list || []
-      total.value = result.data.total || 0
-    }
+
+    users.value = result.list || []
+    total.value = result.total || 0
+    currentPage.value = result.page || 1
   } catch (error) {
     console.error('加载用户列表失败:', error)
   } finally {

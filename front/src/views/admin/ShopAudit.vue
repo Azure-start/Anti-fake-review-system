@@ -6,13 +6,13 @@
           <el-table :data="applications" stripe>
             <el-table-column prop="id" label="ID" width="80" />
             <el-table-column prop="merchantAddress" label="商家地址" width="300">
-              <template #default="{ row }">{{ formatAddress(row.merchantAddress) }}</template>
+              <template #default="{ row }">{{ formatAddress(row.address) }}</template>
             </el-table-column>
             <el-table-column prop="shopName" label="店铺名称" min-width="150" />
             <el-table-column prop="shopDescription" label="店铺描述" min-width="200" />
             <el-table-column prop="status" label="状态" width="120">
               <template #default="{ row }">
-                <el-tag :type="getStatusType(row.status)">{{ getStatusText(row.status) }}</el-tag>
+                <el-tag :type="getStatusType(row.shopStatus)">{{ getStatusText(row.shopStatus) }}</el-tag>
               </template>
             </el-table-column>
             <el-table-column prop="createdAt" label="申请时间" width="180">
@@ -21,7 +21,7 @@
             <el-table-column label="操作" width="200" fixed="right">
               <template #default="{ row }">
                 <el-button
-                  v-if="row.status === 'pending'"
+                  v-if="row.shopStatus === 'pending'"
                   type="success"
                   size="small"
                   @click="handleApprove(row)"
@@ -72,17 +72,17 @@ const total = ref(0)
 // 加载申请列表
 async function loadApplications() {
   loading.value = true
-  
   try {
     const result = await getShopApplications({
       page: currentPage.value,
       pageSize: pageSize.value
     })
-    
-    if (result.code === 0) {
-      applications.value = result.data.list || []
-      total.value = result.data.total || 0
-    }
+    console.log('赋值前 applications:', applications.value)
+    // 直接拿字段
+    applications.value = result.list || []
+    console.log('赋值后 applications:', applications.value)
+    total.value = result.total || 0
+    currentPage.value = result.page || 1
   } catch (error) {
     console.error('加载申请列表失败:', error)
   } finally {

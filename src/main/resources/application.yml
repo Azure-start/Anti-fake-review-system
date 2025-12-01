@@ -35,5 +35,5 @@ mybatis-plus:
 
 logging:
   level:
-    com.yourpackage: debug
+    com.lwf: debug
     org.springframework.web: info

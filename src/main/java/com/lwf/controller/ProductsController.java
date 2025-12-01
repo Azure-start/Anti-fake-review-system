@@ -12,16 +12,33 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
+/**
+ * 商品控制器
+ * 处理商品相关的HTTP请求，包括商品列表查询、商品详情获取、商品评价获取等功能
+ */
 @RestController
 @RequestMapping("/api")
 public class ProductsController {
 
+    /**
+     * 商品服务接口
+     * 用于处理商品相关的业务逻辑
+     */
     @Autowired
     private IProductsService productsService;
 
+    /**
+     * 商品评价服务接口
+     * 用于处理商品评价相关的业务逻辑
+     */
     @Autowired
     private IReviewsService reviewsService;
 
+    /**
+     * 获取商品列表
+     * @param query 商品查询条件对象，包含各种筛选参数
+     * @return 返回一个Result对象，其中包含一个Map类型的响应数据，包含商品列表及分页信息
+     */
     @GetMapping("/products")
     public Result<Map<String, Object>> getProductList(ProductQueryDTO query) {
         try {
@@ -32,6 +49,11 @@ public class ProductsController {
         }
     }
 
+    /**
+     * 获取商品详情
+     * @param productId 商品ID，通过路径变量传递
+     * @return 返回一个Result对象，其中包含商品详细信息
+     */
     @GetMapping("/products/{productId}")
     public Result<Products> getProductDetail(@PathVariable Long productId) {
         try {
@@ -42,6 +64,13 @@ public class ProductsController {
         }
     }
 
+    /**
+     * 获取商品评价列表
+     * @param productId 商品ID，通过路径变量传递
+     * @param page 页码，默认为1
+     * @param pageSize 每页数量，默认为10
+     * @return 返回一个Result对象，其中包含商品评价列表及分页信息
+     */
     @GetMapping("/products/{productId}/reviews")
     public Result<Map<String, Object>> getProductReviews(
             @PathVariable Long productId,
@@ -55,15 +84,6 @@ public class ProductsController {
         }
     }
 
-//    @PostMapping("/reviews")
-//    public Result<Map<String, Object>> submitReview(@Validated @RequestBody ReviewDTO reviewDTO) {
-//        try {
-//            Map<String, Object> result = reviewsService.submitReview(reviewDTO);
-//            return Result.success(result);
-//        } catch (Exception e) {
-//            return Result.error(e.getMessage());
-//        }
-//    }
 
 /**
  * 创建商品接口

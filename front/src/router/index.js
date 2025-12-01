@@ -28,6 +28,11 @@ const routes = [
     meta: { title: '确认订单', requiresAuth: true }
   },
   {
+    path: '/reviews',
+    name: 'UserReviews',
+    component: () => import('@/views/UserReviews.vue')
+  },
+  {
     path: '/transactions',
     name: 'Transactions',
     component: () => import('@/views/Transactions.vue'),

@@ -1,9 +1,6 @@
 import request from './request'
 import { mockProducts, generateMockReviews } from './mockData'
 
-// 是否使用Mock数据（开发模式且后端未启动时自动启用）
-const USE_MOCK = import.meta.env.MODE === 'development'
-
 /**
  * 获取商品列表
  * @param {Object} params - 查询参数
