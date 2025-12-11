@@ -388,7 +388,7 @@ export function generateMockTransactions() {
       amount: 9999,
       status: 'completed',
       receiveStatus: 'confirmed', // confirmed: 已确认收货, pending: 待确认
-      txHash: '0xa1b2c3d4e5f6789012345678901234567890123456789012345678901234567890',
+      txHash: '0x8f3b3b1a7c4d2e9f6a8c5d4e3f2b1a9c8d7e6f5a4b3c2d1e9f8a7b6c5d4e3f2a1b9c8d',
       createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
     },
     {
@@ -399,7 +399,7 @@ export function generateMockTransactions() {
       amount: 1999,
       status: 'completed',
       receiveStatus: 'pending', // 已支付但未确认收货
-      txHash: '0xb2c3d4e5f6789012345678901234567890123456789012345678901234567890ab',
+      txHash: '0x7e6f5a4b3c2d1e9f8a7b6c5d4e3f2a1b9c8d7e6f5a4b3c2d1e9f8a7b6c5d4e3f2a1b9c8d',
       createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
     },
     {
@@ -421,7 +421,7 @@ export function generateMockTransactions() {
       amount: 749,
       status: 'completed',
       receiveStatus: 'confirmed',
-      txHash: '0xc3d4e5f6789012345678901234567890123456789012345678901234567890abcd',
+      txHash: '0x6d4e3f2a1b9c8d7e6f5a4b3c2d1e9f8a7b6c5d4e3f2a1b9c8d7e6f5a4b3c2d1e9f8a7b6c5d4e3f2a1b9c8d',
       createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
     },
     {

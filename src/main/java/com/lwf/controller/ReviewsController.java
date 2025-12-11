@@ -2,6 +2,7 @@ package com.lwf.controller;
 
 import com.lwf.entity.dto.ReviewDTO;
 import com.lwf.service.IReviewsService;
+import com.lwf.utils.JwtUtil;
 import com.lwf.utils.Result;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
@@ -14,7 +15,7 @@ import java.util.Map;
  * 提供提交评价、获取商品评价、获取用户评价、对评价进行投票等功能
  */
 @RestController
-@RequestMapping("/api/reviews")  // 修改为专门的评价路径
+@RequestMapping("/api/reviews") // 修改为专门的评价路径
 public class ReviewsController {
 
     /**
@@ -26,12 +27,27 @@ public class ReviewsController {
 
     /**
      * 提交评价接口
-     * @param reviewDTO 评价数据传输对象，包含评价信息
+     * 
+     * @param reviewDTO     评价数据传输对象，包含评价信息
+     * @param authorization JWT token from request header
      * @return 返回操作结果，包含评价提交后的相关信息
      */
     @PostMapping
-    public Result<Map<String, Object>> submitReview(@Validated @RequestBody ReviewDTO reviewDTO) {
+    public Result<Map<String, Object>> submitReview(@Validated @RequestBody ReviewDTO reviewDTO,
+            @RequestHeader(value = "Authorization", required = false) String authorization) {
         try {
+            // 从JWT token中获取用户地址，如果token不存在则使用请求体中的地址（开发模式）
+            String userAddress;
+            if (authorization != null && !authorization.isEmpty()) {
+                userAddress = JwtUtil.getAddressFromToken(authorization);
+            } else if (reviewDTO.getUserAddress() != null && !reviewDTO.getUserAddress().isEmpty()) {
+                // 开发模式下使用请求体中的地址
+                userAddress = reviewDTO.getUserAddress();
+            } else {
+                return Result.error("用户地址不能为空");
+            }
+            reviewDTO.setUserAddress(userAddress);
+
             Map<String, Object> result = reviewsService.submitReview(reviewDTO);
             return Result.success(result);
         } catch (Exception e) {
@@ -41,9 +57,10 @@ public class ReviewsController {
 
     /**
      * 获取商品评价列表接口
+     * 
      * @param productId 商品ID
      * @param 页码，默认为1
-     * @param pageSize 每页大小，默认为10
+     * @param pageSize  每页大小，默认为10
      * @return 返回操作结果，包含商品评价列表及分页信息
      */
     @GetMapping("/product/{productId}")
@@ -61,9 +78,10 @@ public class ReviewsController {
 
     /**
      * 获取用户评价列表接口
+     * 
      * @param userAddress 用户地址
-     * @param page 页码，默认为1
-     * @param pageSize 每页大小，默认为10
+     * @param page        页码，默认为1
+     * @param pageSize    每页大小，默认为10
      * @return 返回操作结果，包含用户评价列表及分页信息
      */
     @GetMapping("/user")
@@ -81,9 +99,10 @@ public class ReviewsController {
 
     /**
      * 对评价进行投票接口
-     * @param reviewId 评价ID
+     * 
+     * @param reviewId    评价ID
      * @param userAddress 用户地址
-     * @param isHelpful 是否有帮助，true表示有帮助，false表示无帮助
+     * @param isHelpful   是否有帮助，true表示有帮助，false表示无帮助
      * @return 返回操作结果，包含投票后的相关信息
      */
     @PostMapping("/{reviewId}/vote")
@@ -96,6 +115,45 @@ public class ReviewsController {
             return Result.success(result);
         } catch (Exception e) {
             return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 将指定评价上传到区块链
+     * 
+     * @param reviewId 评价ID
+     * @return 返回上链结果，包含交易哈希等信息
+     */
+    @PostMapping("/{reviewId}/upload-to-blockchain")
+    public Result<Map<String, Object>> uploadReviewToBlockchain(@PathVariable Long reviewId) {
+        try {
+            Map<String, Object> result = reviewsService.uploadReviewToBlockchain(reviewId);
+            if ((Integer) result.get("code") == 0) {
+                return Result.success(result);
+            } else {
+                return Result.error(result.get("message").toString());
+            }
+        } catch (Exception e) {
+            return Result.error("上链失败：" + e.getMessage());
+        }
+    }
+
+    /**
+     * 批量将所有未上链的评价上传到区块链
+     * 
+     * @return 返回批量上链结果，包含成功和失败数量
+     */
+    @PostMapping("/upload-all-to-blockchain")
+    public Result<Map<String, Object>> uploadAllUnchainedReviews() {
+        try {
+            Map<String, Object> result = reviewsService.uploadAllUnchainedReviews();
+            if ((Integer) result.get("code") == 0) {
+                return Result.success(result);
+            } else {
+                return Result.error(result.get("message").toString());
+            }
+        } catch (Exception e) {
+            return Result.error("批量上链失败：" + e.getMessage());
         }
     }
 }

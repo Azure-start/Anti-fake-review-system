@@ -1,5 +1,4 @@
 import request from './request'
-import { mockProducts, generateMockReviews } from './mockData'
 
 /**
  * 获取商品列表

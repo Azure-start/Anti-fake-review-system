@@ -92,6 +92,12 @@ public class Orders implements Serializable {
     private String receiveStatus;
 
     /**
+     * 评价状态（0: 未评价，1: 已评价）
+     */
+    @TableField("review_status")
+    private Integer reviewStatus;
+
+    /**
      * 区块链交易哈希
      */
     @TableField("tx_hash")
@@ -108,6 +114,5 @@ public class Orders implements Serializable {
 
     @TableField("updated_at")
     private LocalDateTime updatedAt;
-
 
 }

@@ -8,21 +8,31 @@ import com.lwf.entity.Reviews;
 import com.lwf.entity.Users;
 import com.lwf.entity.dto.ReviewDTO;
 import com.lwf.mapper.ReviewsMapper;
+import com.lwf.service.IOrdersService;
+import com.lwf.model.bo.*;
+import com.lwf.service.ReviewCoreService;
+import org.fisco.bcos.sdk.transaction.model.dto.TransactionResponse;
 import com.lwf.service.IProductsService;
 import com.lwf.service.IReviewsService;
 import com.lwf.service.IUsersService;
 import com.lwf.service.SimpleCacheService;
 import com.lwf.utils.BusinessException;
 import org.springframework.beans.factory.annotation.Autowired;
+import java.math.BigInteger;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.scheduling.annotation.EnableAsync;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Service
+@EnableAsync
 public class ReviewsServiceImpl extends ServiceImpl<ReviewsMapper, Reviews> implements IReviewsService {
 
     @Autowired
@@ -37,18 +47,24 @@ public class ReviewsServiceImpl extends ServiceImpl<ReviewsMapper, Reviews> impl
     @Autowired
     private ReviewsMapper reviewsMapper;
 
-/**
- * 提交商品评价的方法
- * 该方法处理用户提交商品评价的业务逻辑，包括验证、创建评价和更新相关数据
- *
- * @param reviewDTO 包含评价信息的DTO对象
- * @return 返回包含评价结果的Map对象，包含状态码、NFT ID、评价ID和消息
- * @throws BusinessException 当商品不存在、用户不存在或用户已评价过商品时抛出
- */
+    @Autowired
+    private IOrdersService ordersService;
+
+    @Autowired
+    private ReviewCoreService reviewCoreService;
+
+    /**
+     * 提交商品评价的方法
+     * 该方法处理用户提交商品评价的业务逻辑，包括验证、创建评价和更新相关数据
+     *
+     * @param reviewDTO 包含评价信息的DTO对象
+     * @return 返回包含评价结果的Map对象，包含状态码、NFT ID、评价ID和消息
+     * @throws BusinessException 当商品不存在、用户不存在或用户已评价过商品时抛出
+     */
     @Override
-    @Transactional  // 声明事务注解，确保方法内操作的事务性
+    @Transactional // 声明事务注解，确保方法内操作的事务性
     public Map<String, Object> submitReview(ReviewDTO reviewDTO) {
-    // 创建结果Map，用于返回操作结果
+        // 创建结果Map，用于返回操作结果
         Map<String, Object> result = new HashMap<>();
 
         // 验证商品是否存在
@@ -57,18 +73,18 @@ public class ReviewsServiceImpl extends ServiceImpl<ReviewsMapper, Reviews> impl
             throw new BusinessException("商品不存在");
         }
 
-        // 查找用户（这里简化处理，实际应该从token中获取用户信息）
+        // 查找用户（根据用户地址获取）
         QueryWrapper<Users> userQuery = new QueryWrapper<>();
-        userQuery.eq("address", product.getMerchantAddress()); // 简化，实际应该从上下文获取
+        userQuery.eq("address", reviewDTO.getUserAddress()); // 从DTO中获取用户地址
         Users user = usersService.getOne(userQuery);
         if (user == null) {
             throw new BusinessException("用户不存在");
         }
 
-        // 检查是否已经评价过
-        if (hasUserReviewed(user.getId(), reviewDTO.getProductId())) {
-            throw new BusinessException("您已经评价过该商品");
-        }
+        // 移除重复评价检查，允许用户对同一商品进行多次评价
+        // if (hasUserReviewed(user.getId(), reviewDTO.getProductId())) {
+        // throw new BusinessException("您已经评价过该商品");
+        // }
 
         // 创建评价对象并设置属性
         Reviews review = new Reviews();
@@ -78,10 +94,10 @@ public class ReviewsServiceImpl extends ServiceImpl<ReviewsMapper, Reviews> impl
         review.setRating(reviewDTO.getRating());
         review.setContent(reviewDTO.getContent());
         review.setIpfsCid(reviewDTO.getIpfsCid());
-    // 生成唯一的NFT ID，包含商品ID和时间戳
+        // 生成唯一的NFT ID，包含商品ID和时间戳
         review.setNftId("NFT_" + reviewDTO.getProductId() + "_" + System.currentTimeMillis());
-        review.setHelpfulVotes(0);  // 初始化有用投票数为0
-        review.setUnhelpfulVotes(0);  // 初始化无用投票数为0
+        review.setHelpfulVotes(0); // 初始化有用投票数为0
+        review.setUnhelpfulVotes(0); // 初始化无用投票数为0
         review.setVerified(user.getReputationScore() >= 50); // 高信誉用户自动验证
 
         boolean saved = this.save(review);
@@ -91,6 +107,14 @@ public class ReviewsServiceImpl extends ServiceImpl<ReviewsMapper, Reviews> impl
             updateProductRating(reviewDTO.getProductId());
             // 更新用户评价数
             usersService.incrementReviewCount(user.getId());
+
+            // 更新订单评价状态
+            if (reviewDTO.getOrderId() != null) {
+                ordersService.updateReviewStatus(reviewDTO.getOrderId(), 1);
+            }
+
+            // 🚀 异步上传到区块链（不阻塞用户操作）
+            asyncUploadToBlockchain(review.getId());
 
             result.put("code", 0);
             result.put("nftId", review.getNftId());
@@ -134,7 +158,46 @@ public class ReviewsServiceImpl extends ServiceImpl<ReviewsMapper, Reviews> impl
 
         Page<Reviews> reviewPage = this.page(pageInfo, queryWrapper);
 
-        result.put("list", reviewPage.getRecords());
+        // 获取评价列表并补充商品信息
+        List<Reviews> reviews = reviewPage.getRecords();
+        List<Map<String, Object>> reviewListWithProduct = new ArrayList<>();
+
+        for (Reviews review : reviews) {
+            Map<String, Object> reviewData = new HashMap<>();
+            reviewData.put("id", review.getId());
+            reviewData.put("productId", review.getProductId());
+            reviewData.put("userId", review.getUserId());
+            reviewData.put("userAddress", review.getUserAddress());
+            reviewData.put("rating", review.getRating());
+            reviewData.put("content", review.getContent());
+            reviewData.put("ipfsCid", review.getIpfsCid());
+            reviewData.put("images", review.getImages());
+            reviewData.put("nftId", review.getNftId());
+            reviewData.put("helpfulVotes", review.getHelpfulVotes());
+            reviewData.put("unhelpfulVotes", review.getUnhelpfulVotes());
+            reviewData.put("verified", review.getVerified());
+            reviewData.put("txHash", review.getTxHash());
+            reviewData.put("createdAt", review.getCreatedAt());
+
+            // 获取商品信息
+            try {
+                Products product = productsService.getById(review.getProductId());
+                if (product != null) {
+                    reviewData.put("productName", product.getName());
+                    reviewData.put("productAddress", product.getMerchantAddress());
+                } else {
+                    reviewData.put("productName", "未知商品");
+                    reviewData.put("productAddress", "未知地址");
+                }
+            } catch (Exception e) {
+                reviewData.put("productName", "未知商品");
+                reviewData.put("productAddress", "未知地址");
+            }
+
+            reviewListWithProduct.add(reviewData);
+        }
+
+        result.put("list", reviewListWithProduct);
         result.put("total", reviewPage.getTotal());
         result.put("page", page);
         result.put("pageSize", pageSize);
@@ -167,9 +230,10 @@ public class ReviewsServiceImpl extends ServiceImpl<ReviewsMapper, Reviews> impl
     @Override
     /**
      * 对评价进行投票的方法
-     * @param reviewId 评价ID
+     * 
+     * @param reviewId    评价ID
      * @param userAddress 用户地址
-     * @param isHelpful 是否为有用投票
+     * @param isHelpful   是否为有用投票
      * @return 包含投票结果的Map对象，包含状态码、有用票数、无用票数和消息
      */
     public Map<String, Object> voteReview(Long reviewId, String userAddress, boolean isHelpful) {
@@ -220,6 +284,135 @@ public class ReviewsServiceImpl extends ServiceImpl<ReviewsMapper, Reviews> impl
                 product.setRating(BigDecimal.valueOf(avgRating).setScale(2, RoundingMode.HALF_UP));
                 productsService.updateById(product);
             }
+        }
+    }
+
+    /**
+     * 将评论上传到区块链
+     * 
+     * @param reviewId 评论ID
+     * @return 包含上链结果的Map
+     */
+    @Override
+    @Transactional
+    public Map<String, Object> uploadReviewToBlockchain(Long reviewId) {
+        Map<String, Object> result = new HashMap<>();
+
+        try {
+            // 获取评论信息
+            Reviews review = this.getById(reviewId);
+            if (review == null) {
+                throw new BusinessException("评论不存在");
+            }
+
+            // 检查是否已上链
+            if (review.getTxHash() != null && !review.getTxHash().isEmpty()) {
+                result.put("code", 1);
+                result.put("message", "评论已上链，交易哈希：" + review.getTxHash());
+                result.put("txHash", review.getTxHash());
+                return result;
+            }
+
+            // 准备区块链提交数据
+            ReviewCoreSubmitReviewInputBO dto = new ReviewCoreSubmitReviewInputBO();
+            dto.setProductId(String.valueOf(review.getProductId()));
+            dto.setContent(review.getContent());
+            dto.setRating(BigInteger.valueOf(review.getRating()));
+
+            // 提交到区块链
+            TransactionResponse txResp = reviewCoreService.submitReview(dto);
+            String txHash = txResp.getTransactionReceipt().getTransactionHash();
+
+            // 更新数据库中的交易哈希
+            review.setTxHash(txHash);
+            this.updateById(review);
+
+            result.put("code", 0);
+            result.put("message", "评论上链成功");
+            result.put("txHash", txHash);
+            result.put("reviewId", reviewId);
+
+        } catch (Exception e) {
+            result.put("code", -1);
+            result.put("message", "评论上链失败：" + e.getMessage());
+            e.printStackTrace();
+        }
+
+        return result;
+    }
+
+    /**
+     * 批量将未上链的评论上传到区块链
+     * 
+     * @return 包含批量上链结果的Map
+     */
+    @Override
+    @Transactional
+    public Map<String, Object> uploadAllUnchainedReviews() {
+        Map<String, Object> result = new HashMap<>();
+
+        try {
+            // 查询所有未上链的评论
+            QueryWrapper<Reviews> queryWrapper = new QueryWrapper<>();
+            queryWrapper.isNull("tx_hash").or().eq("tx_hash", "");
+            List<Reviews> unchainedReviews = this.list(queryWrapper);
+
+            if (unchainedReviews.isEmpty()) {
+                result.put("code", 1);
+                result.put("message", "没有需要上链的评论");
+                return result;
+            }
+
+            int successCount = 0;
+            int failCount = 0;
+            List<Map<String, Object>> details = new ArrayList<>();
+
+            for (Reviews review : unchainedReviews) {
+                Map<String, Object> singleResult = uploadReviewToBlockchain(review.getId());
+                Map<String, Object> detail = new HashMap<>();
+                detail.put("reviewId", review.getId());
+                detail.put("result", singleResult);
+
+                if ((Integer) singleResult.get("code") == 0) {
+                    successCount++;
+                    detail.put("status", "success");
+                } else {
+                    failCount++;
+                    detail.put("status", "failed");
+                }
+                details.add(detail);
+            }
+
+            result.put("code", 0);
+            result.put("message", String.format("批量上链完成，成功：%d，失败：%d", successCount, failCount));
+            result.put("successCount", successCount);
+            result.put("failCount", failCount);
+            result.put("details", details);
+
+        } catch (Exception e) {
+            result.put("code", -1);
+            result.put("message", "批量上链失败：" + e.getMessage());
+            e.printStackTrace();
+        }
+
+        return result;
+    }
+
+    /**
+     * 异步上传评论到区块链（不阻塞主流程）
+     * 
+     * @param reviewId 评论ID
+     */
+    @Async
+    public void asyncUploadToBlockchain(Long reviewId) {
+        try {
+            // 延迟2秒执行，确保数据库事务提交完成
+            Thread.sleep(2000);
+            Map<String, Object> result = uploadReviewToBlockchain(reviewId);
+            System.out.println("异步上链完成 - 评论ID: " + reviewId + ", 结果: " + result.get("message"));
+        } catch (Exception e) {
+            System.err.println("异步上链失败 - 评论ID: " + reviewId + ", 错误: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 }

@@ -117,7 +117,6 @@ import { ElMessage } from 'element-plus'
 import { CopyDocument, Refresh, View } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/userStore'
 import { getRewardBalance } from '@/api/rewardApi'
-import { mockStats, generateMockCoupons } from '@/api/mockData'
 
 const userStore = useUserStore()
 
@@ -130,13 +129,24 @@ const stats = ref({
 
 const coupons = ref([])
 
-// 加载Mock数据
-function loadMockData() {
-  // 加载统计信息
-  stats.value = { ...mockStats }
-  
-  // 加载优惠券
-  coupons.value = generateMockCoupons()
+// 加载真实数据
+async function loadData() {
+  try {
+    // 这里应该调用真实的API获取统计数据
+    // 暂时使用默认值
+    stats.value = {
+      totalTransactions: 0,
+      totalReviews: 0,
+      totalRewards: '0',
+      totalCoupons: 0
+    }
+    
+    // 这里应该调用真实的API获取优惠券数据
+    // 暂时使用空数组
+    coupons.value = []
+  } catch (error) {
+    console.error('加载数据失败:', error)
+  }
 }
 
 // 复制地址
@@ -183,8 +193,8 @@ function getCouponStatusText(status) {
 }
 
 onMounted(() => {
-  // 加载Mock数据
-  loadMockData()
+  // 加载真实数据
+  loadData()
   handleRefreshBalance()
 })
 </script>

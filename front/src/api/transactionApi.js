@@ -1,27 +1,12 @@
 import request from './request'
-import { generateMockTransactions } from './mockData'
-
-// 是否使用Mock数据
-const USE_MOCK = import.meta.env.MODE === 'development'
 
 /**
  * 创建交易订单
  * @param {Object} data - 订单数据
  */
 export function createTransaction(data) {
-  if (USE_MOCK) {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve({
-          orderId: `ORD${Date.now()}`,
-          txHash: `0x${Math.random().toString(16).slice(2, 66)}`
-        })
-      }, 800)
-    })
-  }
-  
   return request({
-    url: '/transactions/create',
+    url: '/orders',
     method: 'post',
     data
   })
@@ -48,6 +33,45 @@ export function getTransactionDetail(transactionId) {
   return request({
     url: `/orders/${transactionId}`,
     method: 'get'
+  })
+}
+
+/**
+ * 更新订单交易哈希
+ * @param {string|number} orderId - 订单ID
+ * @param {string} txHash - 链上交易哈希
+ */
+export function updateOrderTxHash(orderId, txHash) {
+  return request({
+    url: `/orders/${orderId}/tx-hash`,
+    method: 'put',
+    data: { txHash }
+  })
+}
+
+/**
+ * 更新订单状态
+ * @param {string|number} orderId - 订单ID
+ * @param {string} status - 订单状态
+ */
+export function updateOrderStatus(orderId, status) {
+  return request({
+    url: `/orders/${orderId}/status`,
+    method: 'put',
+    data: { status }
+  })
+}
+
+/**
+ * 确认收货
+ * @param {string|number} orderId - 订单ID
+ * @param {string} userAddress - 用户地址
+ */
+export function confirmReceipt(orderId, userAddress) {
+  return request({
+    url: `/orders/${orderId}/confirm`,
+    method: 'put',
+    params: { userAddress }
   })
 }
 

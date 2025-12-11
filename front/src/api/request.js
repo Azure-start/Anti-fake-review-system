@@ -13,9 +13,12 @@ request.interceptors.request.use(
   (config) => {
     const userStore = useUserStore()
     
-    // 添加token到请求头
+    // 添加token到请求头（开发模式下可选）
     if (userStore.token) {
       config.headers.Authorization = `Bearer ${userStore.token}`
+    } else if (import.meta.env.MODE === 'development') {
+      // 开发模式下，如果没有token也不强制要求
+      console.log('开发模式：请求未携带token')
     }
     
     return config
@@ -64,26 +67,24 @@ request.interceptors.response.use(
           // 可以在这里跳转到登录页
           break
         case 403:
-          // 403 错误不显示，可能是后端未配置
-          console.warn('403 拒绝访问：后端可能未配置')
+          ElMessage.error('拒绝访问')
           break
         case 404:
-          // 404 不显示，后端可能未启动
-          console.warn('404 资源不存在：后端可能未启动')
+          ElMessage.error('请求的资源不存在')
           break
         case 500:
-          // 500 可能是后端未正确配置或崩溃
-          console.warn('500 服务器错误：后端可能未正确配置')
-          // 不显示错误消息
+          ElMessage.error('服务器错误')
           break
         default:
-          console.warn(`HTTP ${status}: ${data?.message || '请求失败'}`)
+          ElMessage.error(data?.message || '请求失败')
       }
     } else if (error.request) {
-      // 网络错误，可能后端服务未启动，不显示错误提示
-      console.warn('网络错误：后端服务可能未启动', error.message)
+      // 网络错误，后端服务未启动
+      console.error('网络错误：后端服务未启动', error.message)
+      ElMessage.error('后端服务未启动，无法获取交易记录')
     } else {
-      console.warn('请求配置错误:', error.message)
+      console.error('请求配置错误:', error.message)
+      ElMessage.error('请求配置错误')
     }
     
     return Promise.reject(error)

@@ -1,8 +1,7 @@
 import request from './request'
-import { generateMockRewards } from './mockData'
 
 // 是否使用Mock数据
-const USE_MOCK = import.meta.env.MODE === 'development'
+const USE_MOCK = false
 
 /**
  * 获取奖励余额

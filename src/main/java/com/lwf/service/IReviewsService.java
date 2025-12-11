@@ -12,4 +12,6 @@ public interface IReviewsService extends IService<Reviews> {
     boolean hasUserReviewed(Long userId, Long productId);
     Double getAverageRating(Long productId);
     Map<String, Object> voteReview(Long reviewId, String userAddress, boolean isHelpful);
+    Map<String, Object> uploadReviewToBlockchain(Long reviewId);
+    Map<String, Object> uploadAllUnchainedReviews();
 }

@@ -106,6 +106,7 @@ const previewImage = ref('')
 const showNftTip = ref(false)
 const nftId = ref('')
 const txHash = ref('')
+const currentOrderId = ref('')
 
 const formRef = ref(null)
 
@@ -135,9 +136,34 @@ const warningText = computed(() => {
 // 检查是否已确认收货
 async function checkTransactionStatus() {
   try {
-    const data = await getUserTransactions()
+    console.log('🔍 开始检查交易状态...')
+    console.log('📍 用户钱包地址:', userStore.walletAddress)
+    console.log('📦 商品ID:', route.params.productId)
+    
+    if (!userStore.walletAddress) {
+      console.warn('⚠️ 用户钱包地址为空，请先连接钱包')
+      hasConfirmedTransaction.value = false
+      return
+    }
+    
+    const data = await getUserTransactions({ userAddress: userStore.walletAddress })
+    console.log('📋 获取到的交易数据:', data)
+    
     const transactions = data.list || []
     const productId = Number(route.params.productId)
+    
+    console.log(`📊 共找到 ${transactions.length} 条交易记录`)
+    console.log('🔎 搜索条件: productId =', productId, ', status = completed, receiveStatus = confirmed')
+    
+    // 打印所有交易记录供调试
+    transactions.forEach((t, index) => {
+      console.log(`  交易[${index}]:`, {
+        productId: t.productId,
+        status: t.status,
+        receiveStatus: t.receiveStatus,
+        orderId: t.orderId
+      })
+    })
     
     // 查找该商品是否有已确认收货的交易
     const confirmedTransaction = transactions.find(
@@ -146,9 +172,19 @@ async function checkTransactionStatus() {
            t.receiveStatus === 'confirmed'
     )
     
+    console.log('✅ 找到符合条件的交易:', !!confirmedTransaction)
+    if (confirmedTransaction) {
+      console.log('📄 匹配的交易详情:', confirmedTransaction)
+      // 保存订单ID，用于提交评价时更新订单状态
+      currentOrderId.value = confirmedTransaction.orderId
+    }
+    
     hasConfirmedTransaction.value = !!confirmedTransaction
+    console.log('🎯 最终评价权限状态:', hasConfirmedTransaction.value)
+    
   } catch (error) {
-    console.error('检查交易状态失败:', error)
+    console.error('❌ 检查交易状态失败:', error)
+    hasConfirmedTransaction.value = false
   }
 }
 
@@ -180,6 +216,12 @@ async function handleSubmit() {
   const valid = await formRef.value.validate().catch(() => false)
   if (!valid) return
 
+  // 检查用户是否已连接钱包
+  if (!userStore.isConnected || !userStore.walletAddress) {
+    ElMessage.error('请先连接钱包')
+    return
+  }
+
   submitting.value = true
   
   try {
@@ -189,7 +231,9 @@ async function handleSubmit() {
       rating: reviewForm.value.rating,
       content: reviewForm.value.content.trim(),
       /* 图片可选：先传 url 数组，后续再支持上传文件 */
-      images: JSON.stringify(fileList.value.map(f => f.url).filter(Boolean))
+      images: JSON.stringify(fileList.value.map(f => f.url).filter(Boolean)),
+      userAddress: userStore.walletAddress, // 添加用户地址
+      orderId: currentOrderId.value // 添加订单ID
     }
 
     const result = await submitReview(payload)
@@ -203,9 +247,14 @@ async function handleSubmit() {
       showNftTip.value = true
     }
     
-    // 跳转到商品详情页
+    // 评价成功后返回到交易记录页面
     setTimeout(() => {
-      router.push(`/product/${route.params.productId}`)
+      // 如果有来源参数，返回到指定页面，否则默认到交易记录
+      if (route.query.from === 'transactions') {
+        router.push('/transactions')
+      } else {
+        router.push(`/product/${route.params.productId}`)
+      }
     }, 2000)
   } catch (error) {
     console.error('提交评价失败:', error)
@@ -229,6 +278,10 @@ function handlePreview(file) {
 }
 
 onMounted(() => {
+  // 从URL参数获取订单ID
+  if (route.query.orderId) {
+    currentOrderId.value = route.query.orderId
+  }
   loadProduct()
 })
 </script>

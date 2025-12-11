@@ -68,7 +68,7 @@ public class OrdersServiceImpl extends ServiceImpl<OrdersMapper, Orders> impleme
         order.setType("purchase");
         order.setStatus("pending");
         order.setReceiveStatus("pending");
-        order.setTxHash("tx_" + System.currentTimeMillis()); // 模拟交易哈希
+        order.setTxHash(null); // 初始时无交易哈希，支付后更新
 
         boolean saved = this.save(order);
 
@@ -129,6 +129,7 @@ public class OrdersServiceImpl extends ServiceImpl<OrdersMapper, Orders> impleme
     }
 
     @Override
+    @Transactional
     public Map<String, Object> updateOrderStatus(String orderId, String status) {
         Map<String, Object> result = new HashMap<>();
 
@@ -140,8 +141,19 @@ public class OrdersServiceImpl extends ServiceImpl<OrdersMapper, Orders> impleme
             throw new BusinessException("订单不存在");
         }
 
+        String oldStatus = order.getStatus();
         order.setStatus(status);
         this.updateById(order);
+
+        // 当订单状态从pending变为completed时，增加商品销量
+        if ("pending".equals(oldStatus) && "completed".equals(status)) {
+            Products product = productsService.getById(order.getProductId());
+            if (product != null) {
+                // 由于订单表中没有数量字段，默认每个订单增加1个销量
+                product.setSales(product.getSales() + 1);
+                productsService.updateById(product);
+            }
+        }
 
         result.put("code", 0);
         result.put("orderId", orderId);
@@ -152,6 +164,7 @@ public class OrdersServiceImpl extends ServiceImpl<OrdersMapper, Orders> impleme
     }
 
     @Override
+    @Transactional
     public Map<String, Object> confirmReceipt(String orderId, String userAddress) {
         Map<String, Object> result = new HashMap<>();
 
@@ -168,8 +181,19 @@ public class OrdersServiceImpl extends ServiceImpl<OrdersMapper, Orders> impleme
             throw new BusinessException("订单状态异常，无法确认收货");
         }
 
-        order.setReceiveStatus("confirmed");
-        this.updateById(order);
+        // 只有在未确认收货的情况下才更新销量
+        if (!"confirmed".equals(order.getReceiveStatus())) {
+            order.setReceiveStatus("confirmed");
+            this.updateById(order);
+
+            // 确认收货时增加商品销量
+            Products product = productsService.getById(order.getProductId());
+            if (product != null) {
+                // 由于订单表中没有数量字段，默认每个订单增加1个销量
+                product.setSales(product.getSales() + 1);
+                productsService.updateById(product);
+            }
+        }
 
         result.put("code", 0);
         result.put("orderId", orderId);
@@ -183,5 +207,101 @@ public class OrdersServiceImpl extends ServiceImpl<OrdersMapper, Orders> impleme
         QueryWrapper<Orders> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("tx_hash", txHash);
         return this.getOne(queryWrapper);
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Object> updateOrderTxHash(String orderId, String txHash) {
+        Map<String, Object> result = new HashMap<>();
+
+        QueryWrapper<Orders> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("order_id", orderId);
+        Orders order = this.getOne(queryWrapper);
+
+        if (order == null) {
+            throw new BusinessException("订单不存在");
+        }
+
+        // 验证交易哈希格式（以太坊交易哈希为66位十六进制字符串）
+        if (txHash != null && !txHash.matches("^0x[a-fA-F0-9]{64}$")) {
+            throw new BusinessException("交易哈希格式不正确");
+        }
+
+        order.setTxHash(txHash);
+        this.updateById(order);
+
+        result.put("code", 0);
+        result.put("orderId", orderId);
+        result.put("txHash", txHash);
+        result.put("message", "交易哈希更新成功");
+
+        return result;
+    }
+
+    @Override
+    public Map<String, Object> getOrderDetail(String orderId) {
+        Map<String, Object> result = new HashMap<>();
+
+        QueryWrapper<Orders> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("order_id", orderId);
+        Orders order = this.getOne(queryWrapper);
+
+        if (order == null) {
+            throw new BusinessException("订单不存在");
+        }
+
+        // 获取商品信息
+        Products product = productsService.getById(order.getProductId());
+        if (product == null) {
+            throw new BusinessException("订单对应的商品不存在");
+        }
+
+        // 获取商家信息
+        Users merchant = usersService.getById(product.getMerchantId());
+        if (merchant == null) {
+            throw new BusinessException("订单对应的商家不存在");
+        }
+
+        // 构建返回结果
+        result.put("orderId", order.getOrderId());
+        result.put("productId", order.getProductId());
+        result.put("productName", product.getName());
+        result.put("amount", order.getAmount());
+        result.put("status", order.getStatus());
+        result.put("receiveStatus", order.getReceiveStatus());
+        result.put("txHash", order.getTxHash());
+        result.put("spec", null); // 数据库中没有spec字段
+        result.put("specText", null); // 数据库中没有spec_text字段
+        result.put("address", null); // 数据库中没有address字段
+        result.put("merchantName", merchant.getShopName());
+        result.put("merchantAddress", product.getMerchantAddress());
+        result.put("createdAt", order.getCreatedAt());
+        result.put("updatedAt", order.getUpdatedAt());
+
+        return result;
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Object> updateReviewStatus(String orderId, Integer reviewStatus) {
+        Map<String, Object> result = new HashMap<>();
+
+        QueryWrapper<Orders> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("order_id", orderId);
+        Orders order = this.getOne(queryWrapper);
+
+        if (order == null) {
+            throw new BusinessException("订单不存在");
+        }
+
+        order.setReviewStatus(reviewStatus);
+        this.updateById(order);
+
+        result.put("code", 0);
+        result.put("orderId", orderId);
+        result.put("reviewStatus", reviewStatus);
+        result.put("message", "评价状态更新成功");
+
+        return result;
     }
 }

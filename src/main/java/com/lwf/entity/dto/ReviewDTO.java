@@ -19,4 +19,6 @@ public class ReviewDTO {
 
     private String ipfsCid;
     private String images;
+    private String userAddress; // 添加用户地址字段
+    private String orderId; // 添加订单ID字段
 }
