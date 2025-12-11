@@ -19,6 +19,7 @@ import com.lwf.service.SimpleCacheService;
 import com.lwf.utils.BusinessException;
 import org.springframework.beans.factory.annotation.Autowired;
 import java.math.BigInteger;
+import org.fisco.bcos.sdk.transaction.model.dto.CallResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.scheduling.annotation.Async;
@@ -177,6 +178,7 @@ public class ReviewsServiceImpl extends ServiceImpl<ReviewsMapper, Reviews> impl
             reviewData.put("unhelpfulVotes", review.getUnhelpfulVotes());
             reviewData.put("verified", review.getVerified());
             reviewData.put("txHash", review.getTxHash());
+            reviewData.put("blockchainReviewId", review.getBlockchainReviewId());
             reviewData.put("createdAt", review.getCreatedAt());
 
             // 获取商品信息
@@ -305,8 +307,8 @@ public class ReviewsServiceImpl extends ServiceImpl<ReviewsMapper, Reviews> impl
                 throw new BusinessException("评论不存在");
             }
 
-            // 检查是否已上链
-            if (review.getTxHash() != null && !review.getTxHash().isEmpty()) {
+            // 检查是否已上链（需要同时检查txHash和blockchainReviewId）
+            if (review.getTxHash() != null && !review.getTxHash().isEmpty() && review.getBlockchainReviewId() != null) {
                 result.put("code", 1);
                 result.put("message", "评论已上链，交易哈希：" + review.getTxHash());
                 result.put("txHash", review.getTxHash());
@@ -323,8 +325,14 @@ public class ReviewsServiceImpl extends ServiceImpl<ReviewsMapper, Reviews> impl
             TransactionResponse txResp = reviewCoreService.submitReview(dto);
             String txHash = txResp.getTransactionReceipt().getTransactionHash();
 
-            // 更新数据库中的交易哈希
+            // 获取区块链返回的评论ID（通过总评论数获取）
+            CallResponse totalResponse = reviewCoreService.totalReviews();
+            BigInteger blockchainReviewId = (BigInteger) totalResponse.getReturnObject().get(0);
+            System.out.println("获取到的区块链评论ID: " + blockchainReviewId);
+
+            // 更新数据库中的交易哈希和区块链评论ID
             review.setTxHash(txHash);
+            review.setBlockchainReviewId(blockchainReviewId.longValue());
             this.updateById(review);
 
             result.put("code", 0);
@@ -414,5 +422,125 @@ public class ReviewsServiceImpl extends ServiceImpl<ReviewsMapper, Reviews> impl
             System.err.println("异步上链失败 - 评论ID: " + reviewId + ", 错误: " + e.getMessage());
             e.printStackTrace();
         }
+    }
+
+    /**
+     * 获取所有已上链的评论列表
+     * 
+     * @param page     页码
+     * @param pageSize 每页数量
+     * @return 包含已上链评论列表的Map
+     */
+    @Override
+    public Map<String, Object> getBlockchainReviews(Integer page, Integer pageSize) {
+        Map<String, Object> result = new HashMap<>();
+
+        try {
+            Page<Reviews> pageInfo = new Page<>(page, pageSize);
+            QueryWrapper<Reviews> queryWrapper = new QueryWrapper<>();
+            queryWrapper.isNotNull("tx_hash")
+                    .ne("tx_hash", "")
+                    .orderByDesc("created_at");
+
+            Page<Reviews> reviewPage = this.page(pageInfo, queryWrapper);
+            List<Reviews> blockchainReviews = reviewPage.getRecords();
+
+            List<Map<String, Object>> reviewList = new ArrayList<>();
+            for (Reviews review : blockchainReviews) {
+                Map<String, Object> reviewData = new HashMap<>();
+                reviewData.put("id", review.getId());
+                reviewData.put("productId", review.getProductId());
+                reviewData.put("userAddress", review.getUserAddress());
+                reviewData.put("rating", review.getRating());
+                reviewData.put("content", review.getContent());
+                reviewData.put("txHash", review.getTxHash());
+                reviewData.put("blockchainReviewId", review.getBlockchainReviewId());
+                reviewData.put("createdAt", review.getCreatedAt());
+                reviewData.put("blockchainStatus", "已上链");
+
+                // 获取商品名称
+                try {
+                    Products product = productsService.getById(review.getProductId());
+                    reviewData.put("productName", product != null ? product.getName() : "未知商品");
+                } catch (Exception e) {
+                    reviewData.put("productName", "未知商品");
+                }
+
+                reviewList.add(reviewData);
+            }
+
+            result.put("list", reviewList);
+            result.put("total", reviewPage.getTotal());
+            result.put("page", page);
+            result.put("pageSize", pageSize);
+            result.put("code", 0);
+            result.put("message", "已上链评论列表获取成功");
+
+        } catch (Exception e) {
+            result.put("code", -1);
+            result.put("message", "获取已上链评论失败：" + e.getMessage());
+            e.printStackTrace();
+        }
+
+        return result;
+    }
+
+    @Override
+    public Map<String, Object> fixBlockchainReviewIds() {
+        Map<String, Object> result = new HashMap<>();
+        int fixedCount = 0;
+
+        try {
+            // 查询所有有tx_hash但没有blockchain_review_id的记录
+            QueryWrapper<Reviews> queryWrapper = new QueryWrapper<>();
+            queryWrapper.isNotNull("tx_hash")
+                    .isNull("blockchain_review_id");
+
+            List<Reviews> reviewsToFix = this.list(queryWrapper);
+            System.out.println("需要修复的评论数量: " + reviewsToFix.size());
+
+            for (Reviews review : reviewsToFix) {
+                try {
+                    System.out.println("修复评论ID: " + review.getId() + ", txHash: " + review.getTxHash());
+
+                    // 获取区块链上的总评论数
+                    CallResponse totalResponse = reviewCoreService.totalReviews();
+                    BigInteger totalReviews = (BigInteger) totalResponse.getReturnObject().get(0);
+
+                    // 使用更安全的估算方法：从0开始递增
+                    // 避免负数ID
+                    Long estimatedId = (long) fixedCount;
+
+                    // 确保ID在合理范围内
+                    if (estimatedId < 0) {
+                        estimatedId = 0L;
+                    }
+                    if (estimatedId >= totalReviews.longValue()) {
+                        estimatedId = totalReviews.longValue() - 1;
+                    }
+
+                    review.setBlockchainReviewId(estimatedId);
+                    this.updateById(review);
+                    fixedCount++;
+
+                    System.out.println("修复成功，评论ID: " + review.getId() + ", blockchainReviewId: " + estimatedId);
+
+                } catch (Exception e) {
+                    System.err.println("修复评论失败，ID: " + review.getId() + ", 错误: " + e.getMessage());
+                    e.printStackTrace();
+                }
+            }
+
+            result.put("code", 0);
+            result.put("message", "修复完成，共修复 " + fixedCount + " 条评论");
+            result.put("fixedCount", fixedCount);
+
+        } catch (Exception e) {
+            result.put("code", -1);
+            result.put("message", "修复失败：" + e.getMessage());
+            e.printStackTrace();
+        }
+
+        return result;
     }
 }

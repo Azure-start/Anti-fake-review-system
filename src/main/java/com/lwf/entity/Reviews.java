@@ -101,6 +101,12 @@ public class Reviews implements Serializable {
     @TableField("tx_hash")
     private String txHash;
 
+    /**
+     * 区块链评论ID
+     */
+    @TableField("blockchain_review_id")
+    private Long blockchainReviewId;
+
     @TableField("created_at")
     private LocalDateTime createdAt;
 

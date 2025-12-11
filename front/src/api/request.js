@@ -41,12 +41,16 @@ request.interceptors.response.use(
       } else {
         // 开发模式下不显示错误，避免后端未启动时看到大量错误提示
         const isDev = import.meta.env.MODE === 'development'
+        const errorMessage = data.message || data.msg || '请求失败'
         if (!isDev) {
-          ElMessage.error(data.message || '请求失败')
+          ElMessage.error(errorMessage)
         } else {
-          console.warn('后端返回错误:', data.message || '请求失败', data)
+          console.warn('后端返回错误:', errorMessage, data)
         }
-        return Promise.reject(new Error(data.message || '请求失败'))
+        const error = new Error(errorMessage)
+        error.code = data.code
+        error.response = data
+        return Promise.reject(error)
       }
     }
     
@@ -57,34 +61,56 @@ request.interceptors.response.use(
     
     if (error.response) {
       const { status, data } = error.response
+      console.error('🌐 HTTP响应错误:', status, data)
+      
+      // 创建详细的错误对象
+      const detailedError = new Error()
+      detailedError.status = status
+      detailedError.response = data
+      detailedError.type = 'HTTP_ERROR'
       
       // 处理不同的状态码
       switch (status) {
         case 401:
-          ElMessage.error('未授权，请重新登录')
+          detailedError.message = '未授权，请重新登录'
+          ElMessage.error(detailedError.message)
           const userStore = useUserStore()
           userStore.logout()
           // 可以在这里跳转到登录页
           break
         case 403:
-          ElMessage.error('拒绝访问')
+          detailedError.message = '拒绝访问'
+          ElMessage.error(detailedError.message)
           break
         case 404:
-          ElMessage.error('请求的资源不存在')
+          detailedError.message = '请求的资源不存在'
+          ElMessage.error(detailedError.message)
           break
         case 500:
-          ElMessage.error('服务器错误')
+          detailedError.message = `服务器错误: ${data?.message || data?.msg || '内部服务器错误'}`
+          ElMessage.error(detailedError.message)
           break
         default:
-          ElMessage.error(data?.message || '请求失败')
+          detailedError.message = data?.message || data?.msg || `HTTP错误 ${status}`
+          ElMessage.error(detailedError.message)
       }
+      
+      return Promise.reject(detailedError)
     } else if (error.request) {
       // 网络错误，后端服务未启动
-      console.error('网络错误：后端服务未启动', error.message)
+      console.error('🌐 网络错误：后端服务未启动', error.message)
+      const networkError = new Error('后端服务未启动，请检查网络连接')
+      networkError.type = 'NETWORK_ERROR'
+      networkError.originalError = error
       ElMessage.error('后端服务未启动，无法获取交易记录')
+      return Promise.reject(networkError)
     } else {
-      console.error('请求配置错误:', error.message)
+      console.error('⚙️ 请求配置错误:', error.message)
+      const configError = new Error('请求配置错误')
+      configError.type = 'CONFIG_ERROR'
+      configError.originalError = error
       ElMessage.error('请求配置错误')
+      return Promise.reject(configError)
     }
     
     return Promise.reject(error)
