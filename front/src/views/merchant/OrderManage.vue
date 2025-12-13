@@ -2,12 +2,48 @@
   <div class="order-manage">
     <div class="container">
       <el-card header="订单管理" class="order-card">
+        <div class="search-form">
+          <el-form :inline="true" :model="searchParams" class="demo-form-inline">
+            <el-form-item label="订单号">
+              <el-input v-model="searchParams.orderId" placeholder="输入订单号" clearable></el-input>
+            </el-form-item>
+            <el-form-item label="商品名称">
+              <el-input v-model="searchParams.productName" placeholder="输入商品名称" clearable></el-input>
+            </el-form-item>
+            <el-form-item label="买家地址">
+              <el-input v-model="searchParams.customerAddress" placeholder="输入买家地址" clearable></el-input>
+            </el-form-item>
+            <el-form-item label="状态">
+              <el-select v-model="searchParams.status" placeholder="选择状态" clearable style="width: 120px;">
+                <el-option label="待支付" value="pending"></el-option>
+                <el-option label="已完成" value="completed"></el-option>
+                <el-option label="已取消" value="cancelled"></el-option>
+                <el-option label="支付失败" value="failed"></el-option>
+              </el-select>
+            </el-form-item>
+            <el-form-item label="创建时间">
+              <el-date-picker
+                v-model="dateRange"
+                type="daterange"
+                range-separator="至"
+                start-placeholder="开始日期"
+                end-placeholder="结束日期"
+                format="YYYY-MM-DD HH:mm:ss"
+                value-format="YYYY-MM-DD HH:mm:ss"
+              ></el-date-picker>
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" @click="handleSearch">查询</el-button>
+              <el-button @click="handleReset">重置</el-button>
+            </el-form-item>
+          </el-form>
+        </div>
         <div v-loading="loading">
           <el-table :data="orders" stripe>
             <el-table-column prop="orderId" label="订单号" width="200" />
             <el-table-column prop="productName" label="商品名称" min-width="200" />
-            <el-table-column prop="customerAddress" label="买家地址" width="200">
-              <template #default="{ row }">{{ formatAddress(row.customerAddress) }}</template>
+            <el-table-column prop="userAddress" label="买家地址" width="200">
+              <template #default="{ row }">{{ formatAddress(row.userAddress) }}</template>
             </el-table-column>
             <el-table-column prop="amount" label="金额" width="120">
               <template #default="{ row }">¥{{ row.amount }}</template>
@@ -34,11 +70,13 @@
 
           <div v-if="orders.length > 0" class="pagination">
             <el-pagination
-              v-model:current-page="currentPage"
+              :current-page="currentPage"
               :page-size="pageSize"
               :total="total"
-              layout="prev, pager, next, jumper, total"
+              :page-sizes="[5, 10, 20, 50]"
+              layout="prev, pager, next, sizes, jumper, total"
               @current-change="handlePageChange"
+              @size-change="handleSizeChange"
             />
           </div>
 
@@ -53,32 +91,71 @@
 import { ref, onMounted } from 'vue'
 import { getShopOrders } from '@/api/merchantApi'
 import { formatAddress } from '@/utils/chainHelper'
+import { useUserStore } from '@/stores/userStore'
+
+const userStore = useUserStore()
 
 const loading = ref(false)
 const orders = ref([])
 const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
+const searchParams = ref({
+  orderId: '',
+  productName: '',
+  customerAddress: '',
+  status: ''
+})
+const dateRange = ref([])
 
 // 加载订单列表
 async function loadOrders() {
   loading.value = true
   
   try {
-    const result = await getShopOrders({
+    const params = {
       page: currentPage.value,
-      pageSize: pageSize.value
-    })
+      pageSize: pageSize.value,
+      merchantAddress: userStore.walletAddress,
+      ...searchParams.value
+    }
+    
+    // 添加时间范围条件
+    if (dateRange.value && dateRange.value.length === 2) {
+      params.startTime = dateRange.value[0]
+      params.endTime = dateRange.value[1]
+    }
+    
+    const result = await getShopOrders(params)
     
     if (result.code === 0) {
-      orders.value = result.data.list || []
-      total.value = result.data.total || 0
+      orders.value = result.list || []
+      total.value = result.total || 0
     }
   } catch (error) {
     console.error('加载订单列表失败:', error)
   } finally {
     loading.value = false
   }
+}
+
+// 搜索
+function handleSearch() {
+  currentPage.value = 1
+  loadOrders()
+}
+
+// 重置
+function handleReset() {
+  searchParams.value = {
+    orderId: '',
+    productName: '',
+    customerAddress: '',
+    status: ''
+  }
+  dateRange.value = []
+  currentPage.value = 1
+  loadOrders()
 }
 
 function getStatusType(status) {
@@ -112,7 +189,14 @@ function formatTime(time) {
   return date.toLocaleString('zh-CN')
 }
 
-function handlePageChange() {
+function handlePageChange(page) {
+  currentPage.value = page
+  loadOrders()
+}
+
+function handleSizeChange(size) {
+  pageSize.value = size
+  currentPage.value = 1
   loadOrders()
 }
 
@@ -148,6 +232,17 @@ onMounted(() => {
   font-size: 18px;
   font-weight: 600;
   padding: 20px 24px;
+}
+
+.search-form {
+  margin-bottom: 20px;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+}
+
+.search-form :deep(.el-form-item) {
+  margin-bottom: 15px;
 }
 
 .pagination {

@@ -29,7 +29,7 @@
                   通过
                 </el-button>
                 <el-button
-                  v-if="row.status === 'pending'"
+                  v-if="row.shopStatus === 'pending'"
                   type="danger"
                   size="small"
                   @click="handleReject(row)"
@@ -42,7 +42,7 @@
 
           <div v-if="applications.length > 0" class="pagination">
             <el-pagination
-              v-model:current-page="currentPage"
+              :current-page="currentPage"
               :page-size="pageSize"
               :total="total"
               layout="prev, pager, next, jumper, total"
@@ -156,7 +156,8 @@ function formatTime(time) {
   return date.toLocaleString('zh-CN')
 }
 
-function handlePageChange() {
+function handlePageChange(page) {
+  currentPage.value = page
   loadApplications()
 }
 
