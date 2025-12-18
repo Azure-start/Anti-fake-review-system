@@ -6,7 +6,6 @@ import com.lwf.utils.Result;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -32,15 +31,11 @@ public class UsersController {
      */
     @PostMapping("/merchant/shop/apply")
     public Result<Map<String, Object>> applyShop(@RequestBody Map<String, String> request) {
-
-        System.out.println(request);
-
         try {
             // 从请求中获取店铺地址、店铺名称和店铺描述
             String address = request.get("address");
             String shopName = request.get("shopName");
             String shopDescription = request.get("shopDescription");
-            String shopLogo = request.get("shopLogo");
 
             // 验证必要参数是否存在
             if (address == null || shopName == null) {
@@ -48,7 +43,7 @@ public class UsersController {
             }
 
             // 调用服务层处理店铺申请逻辑
-            Map<String, Object> result = usersService.applyShop(address, shopName, shopDescription,shopLogo);
+            Map<String, Object> result = usersService.applyShop(address, shopName, shopDescription);
             return Result.success(result);
         } catch (Exception e) {
             // 捕获并返回异常信息
@@ -68,34 +63,6 @@ public class UsersController {
             // 调用服务层获取店铺信息
             Users shopInfo = usersService.getShopInfo(address);
             return Result.success(shopInfo);
-        } catch (Exception e) {
-            // 捕获并返回异常信息
-            return Result.error(e.getMessage());
-        }
-    }
-
-    /**
-     * 更新店铺信息的接口
-     *
-     * @param users 包含店铺信息的Users实体类，前端传来的数据绑定到此对象
-     * @return 返回更新结果或错误信息
-     */
-    @PutMapping("/merchant/shop/updateInfo")
-    public Result<Map<String, Object>> updateShopInfo(@RequestBody Users users) {
-        try {
-            // 验证必要参数
-            if (users.getAddress() == null) {
-                return Result.error("参数不完整：缺少钱包地址");
-            }
-            
-            // 调用服务层更新店铺信息
-            boolean success = usersService.updateShopInfo(users);
-            
-            Map<String, Object> result = new HashMap<>();
-            result.put("success", success);
-            result.put("message", success ? "店铺信息更新成功" : "店铺信息更新失败");
-            
-            return Result.success(result);
         } catch (Exception e) {
             // 捕获并返回异常信息
             return Result.error(e.getMessage());

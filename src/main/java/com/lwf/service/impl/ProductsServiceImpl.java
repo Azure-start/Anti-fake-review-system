@@ -15,9 +15,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -129,19 +126,14 @@ public class ProductsServiceImpl extends ServiceImpl<ProductsMapper, Products> i
     }
 
 /**
- * 根据商家地址获取商品列表，支持多条件查询
+ * 根据商家地址获取商品列表
  * @param merchantAddress 商家地址
  * @param page 当前页码
  * @param pageSize 每页显示数量
- * @param productName 商品名称（可选，支持模糊查询）
- * @param status 商品状态（可选）
- * @param startTime 上架开始时间（可选）
- * @param endTime 上架结束时间（可选）
  * @return 包含商品列表和分页信息的Map对象
  */
     @Override
-    public Map<String, Object> getMerchantProducts(String merchantAddress, Integer page, Integer pageSize,
-                                                   String productName, String status, String startTime, String endTime) {
+    public Map<String, Object> getMerchantProducts(String merchantAddress, Integer page, Integer pageSize) {
     // 创建结果Map对象，用于存储返回的数据
         Map<String, Object> result = new HashMap<>();
 
@@ -150,28 +142,8 @@ public class ProductsServiceImpl extends ServiceImpl<ProductsMapper, Products> i
     // 创建查询条件构造器，用于构建SQL查询条件
         QueryWrapper<Products> queryWrapper = new QueryWrapper<>();
     // 设置查询条件：商家地址相等，并按创建时间降序排列，确保按最新时间排序
-        queryWrapper.eq("merchant_address", merchantAddress);
-    
-    // 商品名称模糊查询
-        if (StringUtils.hasText(productName)) {
-            queryWrapper.like("name", productName);
-        }
-    
-    // 商品状态查询
-        if (StringUtils.hasText(status)) {
-            queryWrapper.eq("status", status);
-        }
-    
-    // 上架时间范围查询
-        if (StringUtils.hasText(startTime)) {
-            queryWrapper.ge("created_at", startTime);
-        }
-        if (StringUtils.hasText(endTime)) {
-            queryWrapper.le("created_at", endTime);
-        }
-    
-    // 按创建时间降序排序
-        queryWrapper.orderByDesc("created_at");
+        queryWrapper.eq("merchant_address", merchantAddress)
+                .orderByDesc("created_at");
 
     // 执行分页查询，将分页对象和查询条件传入，获取分页结果
         Page<Products> productPage = this.page(pageInfo, queryWrapper);
@@ -251,153 +223,6 @@ public class ProductsServiceImpl extends ServiceImpl<ProductsMapper, Products> i
         result.put("code", 0);
         result.put("id", productId);
         result.put("status", status);
-        return result;
-    }
-
-    @Override
-    public Map<String, Object> updateProduct(Long productId, Products product) {
-        Map<String, Object> result = new HashMap<>();
-
-        // 检查商品是否存在
-        Products existingProduct = this.getById(productId);
-        if (existingProduct == null) {
-            throw new BusinessException("商品不存在");
-        }
-
-        // 验证商家身份（确保只有商品的所有者可以更新商品）
-        Users merchant = usersService.getById(existingProduct.getMerchantId());
-        if (merchant == null || !"merchant".equals(merchant.getRole())) {
-            throw new BusinessException("商家身份验证失败");
-        }
-
-        // 更新商品信息
-        existingProduct.setName(product.getName());
-        existingProduct.setDescription(product.getDescription());
-        existingProduct.setPrice(product.getPrice());
-        existingProduct.setImage(product.getImage());
-        existingProduct.setImages(product.getImages());
-        //规格
-        existingProduct.setSpecs(product.getSpecs());
-        //库存
-        existingProduct.setStock(product.getStock());
-        existingProduct.setUpdatedAt(new java.util.Date());
-        // 如果商品状态是已审核，更新后需要重新审核
-        if ("approved".equals(existingProduct.getStatus())) {
-            existingProduct.setStatus("pending");
-        }
-
-        boolean updated = this.updateById(existingProduct);
-
-        if (updated) {
-            result.put("code", 0);
-            result.put("id", productId);
-            result.put("status", existingProduct.getStatus());
-            result.put("message", "商品更新成功，等待审核");
-        } else {
-            throw new BusinessException("商品更新失败");
-        }
-
-        return result;
-    }
-
-    @Override
-    public Map<String, Object> deleteProduct(Long productId) {
-        Map<String, Object> result = new HashMap<>();
-
-        // 检查商品是否存在
-        Products existingProduct = this.getById(productId);
-        if (existingProduct == null) {
-            throw new BusinessException("商品不存在");
-        }
-
-        // 验证商家身份（确保只有商品的所有者可以删除商品）
-        Users merchant = usersService.getById(existingProduct.getMerchantId());
-        if (merchant == null || !"merchant".equals(merchant.getRole())) {
-            throw new BusinessException("商家身份验证失败");
-        }
-
-        // 执行删除操作
-        boolean deleted = this.removeById(productId);
-
-        if (deleted) {
-            result.put("code", 0);
-            result.put("id", productId);
-            result.put("message", "商品删除成功");
-        } else {
-            throw new BusinessException("商品删除失败");
-        }
-
-        return result;
-    }
-
-    @Override
-    public Map<String, Object> offShelfProduct(Long productId) {
-        Map<String, Object> result = new HashMap<>();
-
-        // 检查商品是否存在
-        Products existingProduct = this.getById(productId);
-        if (existingProduct == null) {
-            throw new BusinessException("商品不存在");
-        }
-
-        // 验证商家身份（确保只有商品的所有者可以下架商品）
-        Users merchant = usersService.getById(existingProduct.getMerchantId());
-        if (merchant == null || !"merchant".equals(merchant.getRole())) {
-            throw new BusinessException("商家身份验证失败");
-        }
-
-        // 更新商品状态为下架
-        existingProduct.setStatus("offShelf");
-        existingProduct.setUpdatedAt(new java.util.Date());
-
-        // 执行更新操作
-        boolean updated = this.updateById(existingProduct);
-
-        if (updated) {
-            result.put("code", 0);
-            result.put("id", productId);
-            result.put("status", "offShelf");
-            result.put("message", "商品已下架");
-        } else {
-            throw new BusinessException("商品下架失败");
-        }
-
-        return result;
-    }
-
-
-    @Override
-    public Map<String, Object> onSaleProduct(Long productId) {
-        Map<String, Object> result = new HashMap<>();
-
-        // 检查商品是否存在
-        Products existingProduct = this.getById(productId);
-        if (existingProduct == null) {
-            throw new BusinessException("商品不存在");
-        }
-
-        // 验证商家身份（确保只有商品的所有者可以下架商品）
-        Users merchant = usersService.getById(existingProduct.getMerchantId());
-        if (merchant == null || !"merchant".equals(merchant.getRole())) {
-            throw new BusinessException("商家身份验证失败");
-        }
-
-        // 更新商品状态为上架
-        existingProduct.setStatus("onSale");
-        existingProduct.setUpdatedAt(new java.util.Date());
-
-        // 执行更新操作
-        boolean updated = this.updateById(existingProduct);
-
-        if (updated) {
-            result.put("code", 0);
-            result.put("id", productId);
-            result.put("status", "onSale");
-            result.put("message", "商品已上架");
-        } else {
-            throw new BusinessException("商品上架失败");
-        }
-
         return result;
     }
 }

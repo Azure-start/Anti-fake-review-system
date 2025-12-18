@@ -12,7 +12,7 @@ import java.util.Map;
 public interface IOrdersService extends IService<Orders> {
     /**
      * 创建新订单
-     *
+     * 
      * @param orderDTO 订单数据传输对象，包含创建订单所需的信息
      * @return 返回包含操作结果和数据的Map对象
      */
@@ -20,7 +20,7 @@ public interface IOrdersService extends IService<Orders> {
 
     /**
      * 获取指定用户的订单列表
-     *
+     * 
      * @param userAddress 用户地址，用于标识用户
      * @param page        页码，用于分页查询
      * @param pageSize    每页大小，用于分页查询
@@ -30,7 +30,7 @@ public interface IOrdersService extends IService<Orders> {
 
     /**
      * 获取指定商家的订单列表
-     *
+     * 
      * @param merchantId 商家ID，用于标识商家
      * @param page       页码，用于分页查询
      * @param pageSize   每页大小，用于分页查询
@@ -40,7 +40,7 @@ public interface IOrdersService extends IService<Orders> {
 
     /**
      * 获取订单详情
-     *
+     * 
      * @param orderId 订单ID
      * @return 返回包含订单详细信息的Map对象
      */
@@ -48,7 +48,7 @@ public interface IOrdersService extends IService<Orders> {
 
     /**
      * 更新订单状态
-     *
+     * 
      * @param orderId 订单ID，用于标识要更新的订单
      * @param status  新的订单状态
      * @return 返回包含操作结果和数据的Map对象
@@ -57,7 +57,7 @@ public interface IOrdersService extends IService<Orders> {
 
     /**
      * 确认收货
-     *
+     * 
      * @param orderId     订单ID，用于标识要确认收货的订单
      * @param userAddress 用户地址，用于验证操作权限
      * @return 返回包含操作结果和数据的Map对象
@@ -66,7 +66,7 @@ public interface IOrdersService extends IService<Orders> {
 
     /**
      * 根据交易哈希获取订单信息
-     *
+     * 
      * @param txHash 交易哈希，用于标识订单
      * @return 返回对应的订单对象
      */
@@ -74,7 +74,7 @@ public interface IOrdersService extends IService<Orders> {
 
     /**
      * 更新订单交易哈希
-     *
+     * 
      * @param orderId 订单ID
      * @param txHash  交易哈希
      * @return 返回包含操作结果和数据的Map对象
@@ -83,27 +83,10 @@ public interface IOrdersService extends IService<Orders> {
 
     /**
      * 更新订单评价状态
-     *
+     * 
      * @param orderId      订单ID
      * @param reviewStatus 评价状态（0: 未评价，1: 已评价）
      * @return 返回包含操作结果和数据的Map对象
      */
     Map<String, Object> updateReviewStatus(String orderId, Integer reviewStatus);
-    
-    /**
-     * 根据商家地址获取商家订单列表
-     * @param merchantAddress 商家地址，用于标识商家
-     * @param page 页码，用于分页查询
-     * @param pageSize 每页大小，用于分页查询
-     * @param orderId 订单号
-     * @param productName 商品名称
-     * @param customerAddress 买家地址
-     * @param status 订单状态
-     * @param startTime 开始时间
-     * @param endTime 结束时间
-     * @return 返回包含商家订单列表和分页信息的Map对象
-     */
-    Map<String, Object> getMerchantOrdersByAddress(String merchantAddress, Integer page, Integer pageSize,
-                                                   String orderId, String productName, String customerAddress,
-                                                   String status, String startTime, String endTime);
 }

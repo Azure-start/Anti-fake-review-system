@@ -111,14 +111,7 @@ const routes = [
     name: 'ShopAudit',
     component: () => import('@/views/admin/ShopAudit.vue'),
     meta: { title: '商家审核', requiresAuth: true, requiresRole: 'admin' }
-  },
-  {
-    path: '/admin/product-audit',
-    name: 'ProductAudit',
-    component: () => import('@/views/admin/ProductAudit.vue'),
-    meta: { title: '商品审核', requiresAuth: true, requiresRole: 'admin' }
   }
-  
 ]
 
 const router = createRouter({
