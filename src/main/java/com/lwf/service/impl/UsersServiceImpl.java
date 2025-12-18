@@ -8,6 +8,8 @@ import com.lwf.entity.Users;
 import com.lwf.entity.dto.LoginDTO;
 import com.lwf.mapper.UsersMapper;
 import com.lwf.service.IUsersService;
+import com.lwf.mapper.ProductsMapper;
+import com.lwf.mapper.OrdersMapper;
 import com.lwf.service.NonceService;
 import com.lwf.utils.BusinessException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +24,15 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users> implements
 
     @Autowired
     private NonceService nonceService;
+
+    @Autowired
+    private UsersMapper usersMapper;
+
+    @Autowired
+    private ProductsMapper productsMapper;
+
+    @Autowired
+    private OrdersMapper ordersMapper;
 
     @Override
     public String generateNonce(String address) {
@@ -65,7 +76,7 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users> implements
 
     // 其他方法保持不变...
     @Override
-    public Map<String, Object> applyShop(String address, String shopName, String shopDescription) {
+    public Map<String, Object> applyShop(String address, String shopName, String shopDescription, String shopLogo) {
         Map<String, Object> result = new HashMap<>();
 
         QueryWrapper<Users> queryWrapper = new QueryWrapper<>();
@@ -83,6 +94,7 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users> implements
         user.setRole("merchant");
         user.setShopName(shopName);
         user.setShopDescription(shopDescription);
+        user.setShopLogo(shopLogo);
         user.setShopStatus("pending");
         this.updateById(user);
 
@@ -98,6 +110,26 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users> implements
         QueryWrapper<Users> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("address", address);
         return this.getOne(queryWrapper);
+    }
+
+    @Override
+    public boolean updateShopInfo(Users users) {
+        // 根据地址查询用户是否存在
+        QueryWrapper<Users> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("address", users.getAddress());
+        Users existingUser = this.getOne(queryWrapper);
+        
+        if (existingUser == null) {
+            throw new BusinessException("用户不存在");
+        }
+        
+        // 更新店铺信息
+        existingUser.setShopName(users.getShopName());
+        existingUser.setShopDescription(users.getShopDescription());
+        existingUser.setShopLogo(users.getShopLogo());
+        
+        // 使用MyBatis-Plus的updateById方法更新
+        return this.updateById(existingUser);
     }
 
     @Override
@@ -177,21 +209,30 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users> implements
         Map<String, Object> result = new HashMap<>();
 
         // 总用户数
-        int totalUsers = (int) this.count();
+        long totalUsers = this.count();
 
-        // 商家数
+        // 商家数（已审核通过）
         QueryWrapper<Users> merchantQuery = new QueryWrapper<>();
         merchantQuery.eq("role", "merchant").eq("shop_status", "approved");
-        int totalMerchants = (int) this.count(merchantQuery);
+        long totalMerchants = this.count(merchantQuery);
+
+        // 商品总数与订单总数（直接使用 mapper，避免服务循环依赖）
+        long totalProducts = productsMapper.selectCount(null);
+        long totalOrders = ordersMapper.selectCount(null);
 
         result.put("totalUsers", totalUsers);
         result.put("totalMerchants", totalMerchants);
-        result.put("totalProducts", 0); // 需要从商品服务获取
-        result.put("totalOrders", 0);   // 需要从订单服务获取
+        result.put("totalProducts", totalProducts);
+        result.put("totalOrders", totalOrders);
         result.put("totalTransactions", 0);
         result.put("code", 0);
 
         return result;
+    }
+
+    @Override
+    public Map<String, Object> selectMerchantStats() {
+        return usersMapper.selectMerchantStats();
     }
 
     @Override

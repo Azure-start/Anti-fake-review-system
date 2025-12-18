@@ -1,27 +1,31 @@
 <template>
-  <div class="shop-audit">
+  <div class="product-audit">
     <div class="container">
-      <el-card header="商家审核" class="audit-card">
+      <el-card header="商品审核" class="audit-card">
         <div v-loading="loading">
-          <el-table :data="applications" stripe>
+          <el-table :data="products" stripe>
             <el-table-column prop="id" label="ID" width="80" />
-            <el-table-column prop="merchantAddress" label="商家地址" width="300">
-              <template #default="{ row }">{{ formatAddress(row.address) }}</template>
+            <el-table-column prop="name" label="商品名称" min-width="180" />
+            <el-table-column prop="price" label="价格" width="120">
+              <template #default="{ row }">¥{{ row.price }}</template>
             </el-table-column>
-            <el-table-column prop="shopName" label="店铺名称" min-width="150" />
-            <el-table-column prop="shopDescription" label="店铺描述" min-width="200" />
+            <el-table-column prop="merchantAddress" label="商家地址" min-width="280">
+              <template #default="{ row }">{{ formatAddress(row.merchantAddress) }}</template>
+            </el-table-column>
             <el-table-column prop="status" label="状态" width="120">
               <template #default="{ row }">
-                <el-tag :type="getStatusType(row.shopStatus)">{{ getStatusText(row.shopStatus) }}</el-tag>
+                <el-tag :type="getStatusType(row.status)">
+                  {{ getStatusText(row.status) }}
+                </el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="createdAt" label="申请时间" width="180">
+            <el-table-column prop="createdAt" label="提交时间" width="180">
               <template #default="{ row }">{{ formatTime(row.createdAt) }}</template>
             </el-table-column>
             <el-table-column label="操作" width="200" fixed="right">
               <template #default="{ row }">
                 <el-button
-                  v-if="row.shopStatus === 'pending'"
+                  v-if="row.status === 'pending'"
                   type="success"
                   size="small"
                   @click="handleApprove(row)"
@@ -29,7 +33,7 @@
                   通过
                 </el-button>
                 <el-button
-                  v-if="row.shopStatus === 'pending'"
+                  v-if="row.status === 'pending'"
                   type="danger"
                   size="small"
                   @click="handleReject(row)"
@@ -40,9 +44,9 @@
             </el-table-column>
           </el-table>
 
-          <div v-if="applications.length > 0" class="pagination">
+          <div v-if="products.length > 0" class="pagination">
             <el-pagination
-              :current-page="currentPage"
+              v-model:current-page="currentPage"
               :page-size="pageSize"
               :total="total"
               layout="prev, pager, next, jumper, total"
@@ -50,7 +54,7 @@
             />
           </div>
 
-          <el-empty v-if="applications.length === 0 && !loading" description="暂无待审核申请" />
+          <el-empty v-if="products.length === 0 && !loading" description="暂无待审核商品" />
         </div>
       </el-card>
     </div>
@@ -60,49 +64,43 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getShopApplications, auditShopApplication } from '@/api/adminApi'
+import { getPendingProducts, auditProduct } from '@/api/adminApi'
 import { formatAddress } from '@/utils/chainHelper'
 
 const loading = ref(false)
-const applications = ref([])
+const products = ref([])
 const currentPage = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
 
-// 加载申请列表
-async function loadApplications() {
+async function loadProducts() {
   loading.value = true
   try {
-    const result = await getShopApplications({
+    const result = await getPendingProducts({
       page: currentPage.value,
       pageSize: pageSize.value
     })
-    console.log('赋值前 applications:', applications.value)
-    // 直接拿字段
-    applications.value = result.list || []
-    console.log('赋值后 applications:', applications.value)
+    products.value = result.list || []
     total.value = result.total || 0
     currentPage.value = result.page || 1
   } catch (error) {
-    console.error('加载申请列表失败:', error)
+    console.error('加载待审核商品失败:', error)
   } finally {
     loading.value = false
   }
 }
 
-// 审核通过
 async function handleApprove(row) {
   try {
-    await ElMessageBox.confirm('确定要通过该店铺申请吗？', '提示', {
+    await ElMessageBox.confirm('确定要通过该商品吗？', '提示', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
       type: 'warning'
     })
-    
-    const result = await auditShopApplication(row.id, 'approve')
-    if (result.code === 0) {
+    const result = await auditProduct(row.id, 'approve')
+    if (result.code === 0 || result.id) {
       ElMessage.success('审核通过')
-      await loadApplications()
+      await loadProducts()
     }
   } catch (error) {
     if (error !== 'cancel') {
@@ -111,19 +109,17 @@ async function handleApprove(row) {
   }
 }
 
-// 审核拒绝
 async function handleReject(row) {
   try {
-    await ElMessageBox.confirm('确定要拒绝该店铺申请吗？', '提示', {
+    await ElMessageBox.confirm('确定要拒绝该商品吗？', '提示', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
       type: 'warning'
     })
-    
-    const result = await auditShopApplication(row.id, 'reject')
-    if (result.code === 0) {
+    const result = await auditProduct(row.id, 'reject')
+    if (result.code === 0 || result.id) {
       ElMessage.success('已拒绝')
-      await loadApplications()
+      await loadProducts()
     }
   } catch (error) {
     if (error !== 'cancel') {
@@ -144,7 +140,7 @@ function getStatusType(status) {
 function getStatusText(status) {
   const statusMap = {
     pending: '待审核',
-    approved: '已通过',
+    approved: '已批准',
     rejected: '已拒绝'
   }
   return statusMap[status] || status
@@ -156,18 +152,17 @@ function formatTime(time) {
   return date.toLocaleString('zh-CN')
 }
 
-function handlePageChange(page) {
-  currentPage.value = page
-  loadApplications()
+function handlePageChange() {
+  loadProducts()
 }
 
 onMounted(() => {
-  loadApplications()
+  loadProducts()
 })
 </script>
 
 <style scoped>
-.shop-audit {
+.product-audit {
   padding: 40px 0;
   min-height: calc(100vh - 64px);
   background: linear-gradient(to bottom, #f5f7fa 0%, #ffffff 100%);
