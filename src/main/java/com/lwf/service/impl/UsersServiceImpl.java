@@ -168,7 +168,12 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users> implements
     }
 
     @Override
+    /**
+     * 获取系统统计数据方法
+     * @return 返回一个包含系统统计数据的Map，包括用户数、商家数、商品数、订单数、交易数和状态码
+     */
     public Map<String, Object> getSystemStats() {
+        // 创建一个HashMap用于存储系统统计数据
         Map<String, Object> result = new HashMap<>();
 
         // 总用户数
