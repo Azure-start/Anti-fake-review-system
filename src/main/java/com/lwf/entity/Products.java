@@ -52,4 +52,9 @@ public class Products {
 
     @TableField(value = "updated_at", fill = FieldFill.INSERT_UPDATE)
     private Date updatedAt;
+
+    // 添加商家信息字段（不映射到数据库）
+    @TableField(exist = false)
+    private String shopName;
+
 }

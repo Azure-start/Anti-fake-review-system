@@ -1,9 +1,10 @@
 <template>
   <div class="product-detail">
     <div class="container">
-        <div class="page-controls" style="margin-bottom: 16px;">
-          <el-button type="text" :icon="ArrowLeft" @click="goBack">返回</el-button>
-        </div>
+      <div class="page-controls" style="margin-bottom: 16px;">
+        <el-button type="text" :icon="ArrowLeft" @click="goBack">返回</el-button>
+      </div>
+      
       <!-- 加载状态 -->
       <div v-if="loading" class="loading-container">
         <el-skeleton :rows="8" animated />
@@ -86,7 +87,7 @@
               <div class="merchant-info">
                 <h3>商家信息</h3>
                 <el-descriptions :column="1">
-                  <el-descriptions-item label="商家名称">{{ product.merchantName || '官方店铺' }}</el-descriptions-item>
+                  <el-descriptions-item label="商家名称">{{ product.shopName || '官方店铺' }}</el-descriptions-item>
                   <el-descriptions-item label="商家地址">{{ formatAddress(product.merchantAddress) }}</el-descriptions-item>
                 </el-descriptions>
               </div>
@@ -114,13 +115,13 @@
                 <el-rate v-model="review.rating" disabled />
               </div>
               <div class="review-content">{{ review.content }}</div>
-              <div v-if="review.images && review.images.length > 0" class="review-images">
+              <div v-if="getReviewImages(review).length > 0" class="review-images">
                 <el-image
-                  v-for="(img, idx) in review.images"
+                  v-for="(img, idx) in getReviewImages(review)"
                   :key="idx"
                   :src="img"
                   fit="cover"
-                  :preview-src-list="review.images"
+                  :preview-src-list="getReviewImages(review)"
                   :initial-index="idx"
                   class="review-image"
                 />
@@ -165,7 +166,37 @@ const selectedSpec = ref({})
 
 const productImages = computed(() => {
   if (!product.value) return []
-  return product.value.images || [product.value.image].filter(Boolean)
+  
+  // 统一处理商品图片数据
+  let images = product.value.images
+  
+  if (!images) {
+    // 如果没有 images 字段，使用 image 字段
+    return product.value.image ? [product.value.image] : []
+  }
+  
+  // 如果是字符串，尝试解析
+  if (typeof images === 'string') {
+    try {
+      const parsed = parseJSONString(images)
+      if (Array.isArray(parsed)) {
+        return parsed.filter(img => img && typeof img === 'string')
+      } else if (typeof parsed === 'string') {
+        return parsed ? [parsed] : []
+      }
+      return []
+    } catch (e) {
+      // 解析失败，作为单个图片处理
+      return images.trim() ? [images.trim()] : []
+    }
+  }
+  
+  // 如果是数组，直接返回
+  if (Array.isArray(images)) {
+    return images.filter(img => img && typeof img === 'string')
+  }
+  
+  return []
 })
 
 const isSelfPurchase = computed(() => {
@@ -184,17 +215,90 @@ const canBuy = computed(() => {
   return product.value.specs.every(spec => selectedSpec.value[spec.name])
 })
 
+// 辅助函数：解析 JSON 字符串
+function parseJSONString(str) {
+  if (!str || typeof str !== 'string') return null
+  
+  const trimmed = str.trim()
+  if (!trimmed) return null
+  
+  try {
+    return JSON.parse(trimmed)
+  } catch (e) {
+    // 如果是类似 ["url"] 但没有正确转义的格式
+    if (trimmed.startsWith('["') && trimmed.endsWith('"]')) {
+      const content = trimmed.slice(2, -2)
+      return content ? [content] : []
+    }
+    // 如果是类似 [url] 的格式
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      const content = trimmed.slice(1, -1)
+      return content ? [content] : []
+    }
+    throw e
+  }
+}
+
+// 获取评价图片数组
+function getReviewImages(review) {
+  if (!review.images) return []
+  
+  // 如果已经处理过，直接返回
+  if (review._processedImages && Array.isArray(review._processedImages)) {
+    return review._processedImages
+  }
+  
+  let images = review.images
+  
+  // 如果是字符串，尝试解析
+  if (typeof images === 'string') {
+    try {
+      const parsed = parseJSONString(images)
+      if (Array.isArray(parsed)) {
+        review._processedImages = parsed.filter(img => img && typeof img === 'string')
+      } else if (typeof parsed === 'string') {
+        review._processedImages = parsed ? [parsed] : []
+      } else {
+        review._processedImages = []
+      }
+    } catch (e) {
+      console.warn('评价图片解析失败:', e, images)
+      review._processedImages = images.trim() ? [images.trim()] : []
+    }
+    return review._processedImages || []
+  }
+  
+  // 如果是数组，直接返回
+  if (Array.isArray(images)) {
+    review._processedImages = images.filter(img => img && typeof img === 'string')
+    return review._processedImages
+  }
+  
+  return []
+}
+
 // 加载商品详情
 async function loadProductDetail() {
   loading.value = true
   
   try {
     const data = await getProductDetail(route.params.id)
-    // product.value = data
-    // productStore.setCurrentProduct(data)
-    //
-    if (typeof data.specs === 'string') data.specs = JSON.parse(data.specs)
-    if (typeof data.images === 'string') data.images = JSON.parse(data.images)
+    
+    // 统一处理商品数据
+    if (typeof data.specs === 'string') {
+      try {
+        data.specs = parseJSONString(data.specs)
+      } catch (e) {
+        console.warn('规格数据解析失败:', e)
+        data.specs = []
+      }
+    }
+    
+    // 确保 specs 是数组
+    if (!Array.isArray(data.specs)) {
+      data.specs = []
+    }
+    
     product.value = data
     productStore.setCurrentProduct(data)
     
@@ -223,7 +327,23 @@ async function loadProductDetail() {
 async function loadReviews() {
   try {
     const data = await getProductReviews(route.params.id, { limit: 10 })
-    reviews.value = data.list || []
+    const reviewsData = data.list || []
+    
+    // 预处理评价数据
+    reviewsData.forEach(review => {
+      // 确保图片数据被正确解析
+      if (review.images) {
+        // 调用 getReviewImages 会设置 _processedImages 缓存
+        getReviewImages(review)
+      }
+      
+      // 处理评分
+      if (typeof review.rating === 'string') {
+        review.rating = parseFloat(review.rating) || 0
+      }
+    })
+    
+    reviews.value = reviewsData
   } catch (error) {
     console.error('加载评价失败:', error)
   }
@@ -243,11 +363,16 @@ function handleBuy() {
     return
   }
   
+  // 构建规格信息
+  const specInfo = Object.keys(selectedSpec.value).length > 0 
+    ? JSON.stringify(selectedSpec.value) 
+    : ''
+  
   router.push({
     path: '/checkout',
     query: {
       productId: product.value.id,
-      spec: JSON.stringify(selectedSpec.value)
+      spec: specInfo
     }
   })
 }
@@ -268,8 +393,22 @@ function goBack() {
 // 格式化时间
 function formatTime(time) {
   if (!time) return ''
-  const date = new Date(time)
-  return date.toLocaleString('zh-CN')
+  
+  try {
+    const date = new Date(time)
+    if (isNaN(date.getTime())) {
+      // 如果日期无效，尝试解析为时间戳
+      const timestamp = parseInt(time)
+      if (!isNaN(timestamp)) {
+        return new Date(timestamp).toLocaleString('zh-CN')
+      }
+      return time
+    }
+    return date.toLocaleString('zh-CN')
+  } catch (e) {
+    console.warn('时间格式化失败:', e, time)
+    return time
+  }
 }
 
 onMounted(() => {
@@ -489,4 +628,3 @@ onMounted(() => {
   margin-top: 12px;
 }
 </style>
-

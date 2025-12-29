@@ -32,6 +32,9 @@ public class AuthController {
      */
     @PostMapping("/nonce")
     public Result<String> getNonce(@RequestBody Map<String, String> request) {
+
+        System.out.println("我进来获取nonce值了");
+
         String address = request.get("address");
         if (address == null || address.isEmpty()) {
             return Result.error("地址不能为空");
@@ -48,6 +51,10 @@ public class AuthController {
      */
     @PostMapping("/signin")
     public Result<Map<String, Object>> signIn(@Validated @RequestBody LoginDTO loginDTO) {
+
+        System.out.println("我进来登录验证了");
+        System.out.println(loginDTO);
+
         try {
             Map<String, Object> result = usersService.signIn(loginDTO);
             return Result.success(result);

@@ -11,6 +11,7 @@ import com.lwf.mapper.ReviewsMapper;
 import com.lwf.service.IOrdersService;
 import com.lwf.model.bo.*;
 import com.lwf.service.ReviewCoreService;
+import com.lwf.service.ReviewNFTService;
 import org.fisco.bcos.sdk.transaction.model.dto.TransactionResponse;
 import com.lwf.service.IProductsService;
 import com.lwf.service.IReviewsService;
@@ -54,6 +55,9 @@ public class ReviewsServiceImpl extends ServiceImpl<ReviewsMapper, Reviews> impl
     @Autowired
     private ReviewCoreService reviewCoreService;
 
+    @Autowired
+    private ReviewNFTService reviewNFTService;
+
     /**
      * 提交商品评价的方法
      * 该方法处理用户提交商品评价的业务逻辑，包括验证、创建评价和更新相关数据
@@ -95,8 +99,9 @@ public class ReviewsServiceImpl extends ServiceImpl<ReviewsMapper, Reviews> impl
         review.setRating(reviewDTO.getRating());
         review.setContent(reviewDTO.getContent());
         review.setIpfsCid(reviewDTO.getIpfsCid());
+        review.setImages(reviewDTO.getImages());
         // 生成唯一的NFT ID，包含商品ID和时间戳
-        review.setNftId("NFT_" + reviewDTO.getProductId() + "_" + System.currentTimeMillis());
+        review.setNftId("NFT_" + reviewDTO.getProductId() + "_"  + System.currentTimeMillis());
         review.setHelpfulVotes(0); // 初始化有用投票数为0
         review.setUnhelpfulVotes(0); // 初始化无用投票数为0
         review.setVerified(user.getReputationScore() >= 50); // 高信誉用户自动验证
@@ -330,9 +335,14 @@ public class ReviewsServiceImpl extends ServiceImpl<ReviewsMapper, Reviews> impl
             BigInteger blockchainReviewId = (BigInteger) totalResponse.getReturnObject().get(0);
             System.out.println("获取到的区块链评论ID: " + blockchainReviewId);
 
-            // 更新数据库中的交易哈希和区块链评论ID
+            // 获取NFT ID（tokenId与blockchainReviewId相同）
+            String nftId = "NFT_" + blockchainReviewId.toString();
+            System.out.println("获取到的NFT ID: " + nftId);
+         
+            // 更新数据库中的交易哈希、区块链评论ID和NFT ID
             review.setTxHash(txHash);
             review.setBlockchainReviewId(blockchainReviewId.longValue());
+            review.setNftId(nftId);
             this.updateById(review);
 
             result.put("code", 0);

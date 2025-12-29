@@ -34,15 +34,23 @@
             </el-form-item>
 
             <el-form-item label="上传图片">
+              <!-- 修改后的上传组件 -->
               <el-upload
                 v-model:file-list="fileList"
                 action="#"
                 :auto-upload="false"
                 :limit="3"
+                :on-change="handleImageChange"
                 :on-preview="handlePreview"
+                :on-remove="handleRemove"
                 list-type="picture-card"
+                multiple
+                accept=".jpg,.jpeg,.png,.gif,.webp"
               >
                 <el-icon><Plus /></el-icon>
+                <template #tip>
+                  <div class="upload-tip">最多上传3张图片，支持JPG、PNG、GIF、WEBP格式，每张不超过5MB</div>
+                </template>
               </el-upload>
             </el-form-item>
 
@@ -58,7 +66,7 @@
             </el-alert>
 
             <el-form-item>
-              <el-button type="primary" @click="handleSubmit" :loading="submitting" :disabled="!canReview">
+              <el-button type="primary" @click="handleSubmit" :loading="submitting" :disabled="!canReview || uploadingImages">
                 提交评价
               </el-button>
               <el-button @click="handleCancel">取消</el-button>
@@ -91,6 +99,7 @@ import { useUserStore } from '@/stores/userStore'
 import { getProductDetail, submitReview } from '@/api/productApi'
 import { getUserTransactions } from '@/api/transactionApi'
 import NftTip from '@/components/NftTip.vue'
+import request from '@/api/request'
 
 const route = useRoute()
 const router = useRouter()
@@ -98,9 +107,11 @@ const userStore = useUserStore()
 
 const loading = ref(false)
 const submitting = ref(false)
+const uploadingImages = ref(false)
 const product = ref(null)
 const hasConfirmedTransaction = ref(false)
 const fileList = ref([])
+const imageUrls = ref([]) // 存储已上传的图片URL
 const previewVisible = ref(false)
 const previewImage = ref('')
 const showNftTip = ref(false)
@@ -132,6 +143,105 @@ const canReview = computed(() => {
 const warningText = computed(() => {
   return '请先完成购买并确认收货后才能评价'
 })
+
+// 验证文件（复用开店申请页面的逻辑）
+function validateFile(file) {
+  const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
+  if (!validTypes.includes(file.type)) {
+    ElMessage.error('只支持 JPG、PNG、GIF、WEBP 格式的图片')
+    return false
+  }
+  const maxSize = 5 * 1024 * 1024
+  if (file.size > maxSize) {
+    ElMessage.error('图片大小不能超过 5MB')
+    return false
+  }
+  return true
+}
+
+async function uploadFileToServer(file) {
+  const formData = new FormData()
+  formData.append('file', file)
+  try {
+    const res = await request.post('/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+    // request 拦截器会返回解包后的数据
+    return res
+  } catch (e) {
+    console.error('上传图片失败', e)
+    ElMessage.error('图片上传失败')
+    throw e
+  }
+}
+
+// 处理图片上传（修复参数问题）
+async function handleImageChange(uploadFile, uploadFiles) {
+  console.log('[review] handleImageChange called', uploadFile, uploadFiles)
+  const realFile = uploadFile && uploadFile.raw ? uploadFile.raw : uploadFile
+  if (!realFile) return
+
+  if (!validateFile(realFile)) {
+    // 从fileList中移除无效文件
+    const index = fileList.value.findIndex(f => f.uid === uploadFile.uid)
+    if (index > -1) {
+      fileList.value.splice(index, 1)
+    }
+    return false
+  }
+
+  try {
+    uploadingImages.value = true
+    
+    // 生成本地预览URL
+    const localUrl = URL.createObjectURL(realFile)
+    
+    // 更新当前文件的预览URL
+    const fileIndex = fileList.value.findIndex(f => f.uid === uploadFile.uid)
+    if (fileIndex > -1) {
+      fileList.value[fileIndex].url = localUrl
+    }
+    
+    // 上传到服务器
+    const serverUrl = await uploadFileToServer(realFile)
+    console.log('[review] uploadFileToServer returned:', serverUrl)
+    
+    // 释放本地URL
+    URL.revokeObjectURL(localUrl)
+    
+    // 更新为服务器URL
+    if (fileIndex > -1) {
+      fileList.value[fileIndex].url = serverUrl
+    }
+    
+    // 保存到imageUrls数组
+    if (!imageUrls.value.includes(serverUrl)) {
+      imageUrls.value.push(serverUrl)
+    }
+    
+    ElMessage.success('图片上传成功')
+  } catch (err) {
+    console.error('图片上传错误:', err)
+    ElMessage.error('图片上传失败')
+    
+    // 上传失败时从fileList中移除
+    const index = fileList.value.findIndex(f => f.uid === uploadFile.uid)
+    if (index > -1) {
+      fileList.value.splice(index, 1)
+    }
+  } finally {
+    uploadingImages.value = false
+  }
+}
+
+// 处理图片删除
+function handleRemove(file, fileList) {
+  const urlToRemove = file.url
+  const index = imageUrls.value.findIndex(url => url === urlToRemove)
+  if (index > -1) {
+    imageUrls.value.splice(index, 1)
+  }
+}
 
 // 检查是否已确认收货
 async function checkTransactionStatus() {
@@ -222,20 +332,31 @@ async function handleSubmit() {
     return
   }
 
+  // 等待所有图片上传完成
+  if (uploadingImages.value) {
+    ElMessage.warning('请等待图片上传完成')
+    return
+  }
+
   submitting.value = true
   
   try {
-    /* === ① 构造普通对象，不再用 FormData === */
+    // 使用从fileList中获取的已上传图片URL
+    const uploadedImages = fileList.value
+      .map(f => f.url)
+      .filter(url => url && url.startsWith('http')) // 确保是服务器URL
+    
     const payload = {
       productId: Number(route.params.productId),
       rating: reviewForm.value.rating,
       content: reviewForm.value.content.trim(),
-      /* 图片可选：先传 url 数组，后续再支持上传文件 */
-      images: JSON.stringify(fileList.value.map(f => f.url).filter(Boolean)),
-      userAddress: userStore.walletAddress, // 添加用户地址
-      orderId: currentOrderId.value // 添加订单ID
+      images: JSON.stringify(uploadedImages),
+      userAddress: userStore.walletAddress,
+      orderId: currentOrderId.value
     }
 
+    console.log('提交评价的数据:', payload)
+    
     const result = await submitReview(payload)
     
     ElMessage.success('评价提交成功')
@@ -249,7 +370,6 @@ async function handleSubmit() {
     
     // 评价成功后返回到交易记录页面
     setTimeout(() => {
-      // 如果有来源参数，返回到指定页面，否则默认到交易记录
       if (route.query.from === 'transactions') {
         router.push('/transactions')
       } else {
@@ -360,5 +480,11 @@ onMounted(() => {
   border-radius: 12px;
   font-weight: 600;
 }
-</style>
 
+/* 新增上传提示样式 */
+.upload-tip {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 8px;
+}
+</style>

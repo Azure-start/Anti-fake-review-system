@@ -113,6 +113,7 @@
                   <el-button 
                     v-if="paymentStatus === 'pending'" 
                     @click="handleCheckPayment"
+                    :loading="refreshing"
                     size="large"
                   >
                     刷新状态
@@ -185,6 +186,7 @@ const orderData = ref(null)
 const currentStep = ref(0)
 const paymentStatus = ref('pending') // pending / success / failed
 const gasPrice = ref('') // 当前gas价格
+const refreshing = ref(false) // 刷新状态按钮的加载状态
 
 const addressForm = ref({
   name: '',
@@ -587,31 +589,40 @@ async function waitForTransaction(txHash) {
         console.warn('获取完整交易详情失败:', txError)
       }
       
+      // 立即更新支付状态为成功（确保界面立即响应）
+      paymentStatus.value = 'success'
+      console.log('✅ 支付状态已更新为: success')
+      console.log('当前 paymentStatus.value:', paymentStatus.value)
+      
       ElMessage.success('支付成功！交易已在链上确认')
       
-      // 更新支付状态
-      paymentStatus.value = 'success'
-      
-      // 更新后端订单交易哈希（确保数据库中的交易哈希与链上一致）
-      if (orderData.value.orderId && orderData.value.txHash) {
-        try {
-          console.log('🔄 正在更新后端订单交易哈希...')
-          await updateOrderTxHash(orderData.value.orderId, orderData.value.txHash)
-          console.log('✅ 后端订单交易哈希更新成功')
-          
-          // 更新订单状态为已完成
-          console.log('🔄 正在更新订单状态为已完成...')
-          await updateOrderStatus(orderData.value.orderId, 'completed')
-          console.log('✅ 订单状态更新成功')
-        } catch (updateError) {
-          console.warn('⚠️ 更新后端数据失败:', updateError)
-          // 不阻塞主流程，只是警告
+      // 异步更新后端数据，不阻塞前端状态更新
+      const updateBackend = async () => {
+        if (orderData.value.orderId && orderData.value.txHash) {
+          try {
+            console.log('🔄 正在更新后端订单交易哈希...')
+            await updateOrderTxHash(orderData.value.orderId, orderData.value.txHash)
+            console.log('✅ 后端订单交易哈希更新成功')
+            
+            // 更新订单状态为已完成
+            console.log('🔄 正在更新订单状态为已完成...')
+            await updateOrderStatus(orderData.value.orderId, 'completed')
+            console.log('✅ 订单状态更新成功')
+          } catch (updateError) {
+            console.warn('⚠️ 更新后端数据失败:', updateError)
+            // 后端更新失败不影响前端状态
+          }
         }
       }
       
-      // 自动进入下一步（支付成功页面）
+      // 后台异步更新，不阻塞
+      updateBackend()
+      
+      // 立即进入下一步（不等待后端更新）
       setTimeout(() => {
         currentStep.value = 2
+        console.log('✅ 页面已切换到支付成功步骤')
+        console.log('当前 paymentStatus.value:', paymentStatus.value)
       }, 1500)
       
     } else {
@@ -622,13 +633,150 @@ async function waitForTransaction(txHash) {
     
   } catch (error) {
     console.error('等待交易确认失败：', error)
-    ElMessage.error('交易确认超时，请手动检查交易状态')
-    paymentStatus.value = 'failed'
+    
+    // 尝试手动检查交易状态
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum)
+      const receipt = await provider.getTransactionReceipt(txHash)
+      
+      if (receipt && receipt.status === 1) {
+        // 交易实际上已成功，更新状态
+        console.log('⚠️ 等待超时但交易已成功:', receipt)
+        orderData.value.txHash = receipt.hash
+        paymentStatus.value = 'success'
+        ElMessage.success('交易已确认成功')
+        
+        // 更新后端
+        if (orderData.value.orderId && orderData.value.txHash) {
+          try {
+            await updateOrderTxHash(orderData.value.orderId, orderData.value.txHash)
+            await updateOrderStatus(orderData.value.orderId, 'completed')
+          } catch (e) {
+            console.warn('更新后端失败:', e)
+          }
+        }
+        
+        setTimeout(() => {
+          currentStep.value = 2
+        }, 1500)
+        return
+      }
+    } catch (checkError) {
+      console.error('手动检查交易状态也失败:', checkError)
+    }
+    
+    ElMessage.error('交易确认超时，请点击"刷新状态"按钮检查订单状态')
+    paymentStatus.value = 'pending' // 保持待确认状态，让用户可以刷新
   }
 }
 
-function handleCheckPayment() {
-  ElMessage('已刷新，链上确认后即可完成支付')
+async function handleCheckPayment() {
+  if (!orderData.value?.orderId) {
+    ElMessage.warning('订单信息不完整')
+    return
+  }
+  
+  if (refreshing.value) {
+    return // 防止重复点击
+  }
+  
+  refreshing.value = true
+  
+  try {
+    console.log('🔄 开始检查订单状态...')
+    
+    // 1. 先查询后端订单状态
+    const orderDetail = await getTransactionDetail(orderData.value.orderId)
+    console.log('📋 查询到的订单状态:', orderDetail)
+    console.log('   - 订单ID:', orderDetail.orderId)
+    console.log('   - 交易哈希:', orderDetail.txHash)
+    console.log('   - 订单状态:', orderDetail.status)
+    
+    if (orderDetail.txHash && orderDetail.txHash !== 'pending' && orderDetail.txHash !== '') {
+      // 订单已有交易哈希，更新到前端
+      orderData.value.txHash = orderDetail.txHash
+      console.log('✅ 订单已有交易哈希:', orderDetail.txHash)
+      
+      // 尝试验证链上状态（如果MetaMask可用）
+      if (window.ethereum) {
+        try {
+          const provider = new ethers.BrowserProvider(window.ethereum)
+          const receipt = await provider.getTransactionReceipt(orderDetail.txHash)
+          console.log('📋 链上交易收据:', receipt)
+          
+          if (receipt) {
+            if (receipt.status === 1) {
+              // 交易已在链上确认成功
+              console.log('✅ 链上确认交易成功')
+              paymentStatus.value = 'success'
+              ElMessage.success('支付已确认！交易已在链上完成')
+              
+              // 确保后端状态是最新的（异步，不阻塞）
+              updateOrderStatus(orderData.value.orderId, 'completed').catch(e => {
+                console.warn('更新订单状态失败:', e)
+              })
+              
+              // 自动进入下一步
+              setTimeout(() => {
+                currentStep.value = 2
+              }, 1000)
+            } else if (receipt.status === 0) {
+              // 交易失败
+              console.log('❌ 链上交易失败')
+              ElMessage.error('交易已失败，请重新支付')
+              paymentStatus.value = 'failed'
+            }
+          } else {
+            // 收据为null，交易还在处理中
+            console.log('⏳ 交易还在处理中')
+            ElMessage.info('交易正在链上处理，请稍后再试')
+          }
+        } catch (chainError) {
+          console.warn('⚠️ 查询链上状态失败:', chainError)
+          // 无法查询链上状态，但订单有交易哈希，根据后端状态判断
+          if (orderDetail.status === 'completed') {
+            console.log('✅ 后端显示订单已完成')
+            paymentStatus.value = 'success'
+            ElMessage.success('订单已完成（后端确认）')
+            setTimeout(() => {
+              currentStep.value = 2
+            }, 1000)
+          } else {
+            ElMessage.warning('订单有交易哈希但无法验证链上状态，交易ID: ' + orderDetail.txHash)
+          }
+        }
+      } else {
+        // 没有MetaMask，根据后端状态判断
+        console.log('⚠️ MetaMask不可用，使用后端状态')
+        if (orderDetail.status === 'completed') {
+          paymentStatus.value = 'success'
+          ElMessage.success('订单已完成')
+          setTimeout(() => {
+            currentStep.value = 2
+          }, 1000)
+        } else {
+          ElMessage.info('订单有交易哈希: ' + orderDetail.txHash)
+        }
+      }
+    } else if (orderDetail.status === 'completed') {
+      // 订单状态已完成，但可能没有交易哈希
+      console.log('✅ 订单状态为已完成')
+      paymentStatus.value = 'success'
+      ElMessage.success('订单已完成')
+      setTimeout(() => {
+        currentStep.value = 2
+      }, 1000)
+    } else {
+      // 还未支付或交易未确认
+      console.log('⏳ 订单尚未支付')
+      ElMessage.info('订单尚未支付，请点击"确认支付"按钮完成付款')
+    }
+  } catch (error) {
+    console.error('❌ 检查订单状态失败:', error)
+    ElMessage.error('检查订单状态失败: ' + (error.message || '请稍后再试'))
+  } finally {
+    refreshing.value = false
+  }
 }
 
 function handleCancel() {

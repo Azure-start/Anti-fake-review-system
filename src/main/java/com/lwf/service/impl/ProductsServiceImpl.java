@@ -27,6 +27,9 @@ public class ProductsServiceImpl extends ServiceImpl<ProductsMapper, Products> i
     @Autowired
     private IUsersService usersService;
 
+    @Autowired
+    private ProductsMapper productsMapper;
+
     @Override
     /**
      * 获取商品列表
@@ -43,13 +46,23 @@ public class ProductsServiceImpl extends ServiceImpl<ProductsMapper, Products> i
         QueryWrapper<Products> queryWrapper = new QueryWrapper<>();
 
         // 只查询已审核的商品，设置查询条件
-        queryWrapper.eq("status", "approved");
+        queryWrapper.eq("status", "onSale");
 
-        // 如果查询关键词不为空，则添加商品名称和描述的模糊查询条件
+//        // 如果查询关键词不为空，则添加商品名称和描述的模糊查询条件
+        //使用这个会，在进行条件查询时会把不在售的商品查出来
+//        if (StringUtils.hasText(query.getKeyword())) {
+//            queryWrapper.like("name", query.getKeyword())
+//                    .or()
+//                    .like("description", query.getKeyword());
+//        }
+
+        // 关键词搜索条件
         if (StringUtils.hasText(query.getKeyword())) {
-            queryWrapper.like("name", query.getKeyword())
+            queryWrapper.and(wrapper -> wrapper
+                    .like("name", query.getKeyword())
                     .or()
-                    .like("description", query.getKeyword());
+                    .like("description", query.getKeyword())
+            );
         }
 
         // 排序逻辑处理
@@ -89,7 +102,7 @@ public class ProductsServiceImpl extends ServiceImpl<ProductsMapper, Products> i
     @Override
     public Products getProductDetail(Long productId) {
     // 根据商品ID查询商品信息
-        Products product = this.getById(productId);
+        Products product = productsMapper.getProductById(productId);
     // 判断商品是否存在，不存在则抛出业务异常
         if (product == null) {
             throw new BusinessException("商品不存在");
@@ -281,8 +294,13 @@ public class ProductsServiceImpl extends ServiceImpl<ProductsMapper, Products> i
         //库存
         existingProduct.setStock(product.getStock());
         existingProduct.setUpdatedAt(new java.util.Date());
-        // 如果商品状态是已审核，更新后需要重新审核
-        if ("approved".equals(existingProduct.getStatus())) {
+        // 如果商品状态是pending、approved、rejected、onSale、offShelf，更新后需要重新审核
+        String currentStatus = existingProduct.getStatus();
+        if ("pending".equals(currentStatus) ||
+                "approved".equals(currentStatus) ||
+                "rejected".equals(currentStatus) ||
+                "onSale".equals(currentStatus) ||
+                "offShelf".equals(currentStatus)) {
             existingProduct.setStatus("pending");
         }
 

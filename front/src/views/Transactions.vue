@@ -12,7 +12,7 @@
         />
         <div v-loading="loading">
           <el-table :data="transactions" stripe>
-            <el-table-column prop="orderId" label="订单号" width="200" />
+            <el-table-column prop="orderId" label="订单号" width="220" />
             <el-table-column prop="productName" label="商品名称" />
             <el-table-column prop="amount" label="金额" width="120">
               <template #default="{ row }">
@@ -93,7 +93,7 @@
       </el-card>
     </div>
     <!-- 订单详情弹窗 -->
-    <el-dialog v-model="detailVisible" title="订单详情" width="600px">
+    <el-dialog v-model="detailVisible" title="订单详情" width="900px">
       <el-descriptions :column="2" border>
         <el-descriptions-item label="订单号">{{ currentOrder.orderId }}</el-descriptions-item>
         <el-descriptions-item label="商品">{{ currentOrder.productName }}</el-descriptions-item>

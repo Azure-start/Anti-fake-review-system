@@ -22,6 +22,28 @@ export const useUserStore = defineStore('user', () => {
   const isAdmin = computed(() => userRole.value === 'admin')
   const hasShop = computed(() => shopInfo.value !== null)
 
+  // 检查token是否过期（通过解析JWT中的exp字段）
+  function isTokenExpired(token) {
+    try {
+      const parts = token.split('.')
+      if (parts.length !== 3) return true
+      
+      // 解码payload（第二部分）
+      const payload = JSON.parse(atob(parts[1]))
+      const expirationTime = payload.exp * 1000 // 转换为毫秒
+      const now = Date.now()
+      
+      if (now >= expirationTime) {
+        console.log('Token已过期，过期时间:', new Date(expirationTime).toLocaleString())
+        return true
+      }
+      return false
+    } catch (error) {
+      console.error('检查Token过期时出错:', error)
+      return true // 如果无法解析，视为过期
+    }
+  }
+
   // 初始化时从localStorage恢复状态
   function initStore() {
     const savedAddress = localStorage.getItem('walletAddress')
@@ -30,6 +52,16 @@ export const useUserStore = defineStore('user', () => {
     const savedShopInfo = localStorage.getItem('shopInfo')
     
     if (savedAddress && savedToken) {
+      // 检查token是否过期
+      if (isTokenExpired(savedToken)) {
+        console.log('恢复状态时发现Token已过期，清除状态')
+        localStorage.removeItem('walletAddress')
+        localStorage.removeItem('token')
+        localStorage.removeItem('userRole')
+        localStorage.removeItem('shopInfo')
+        return
+      }
+      
       walletAddress.value = savedAddress
       token.value = savedToken
       isConnected.value = true
@@ -118,6 +150,7 @@ export const useUserStore = defineStore('user', () => {
     isAdmin,
     hasShop,
     initStore,
+    isTokenExpired,
     setWalletAddress,
     setToken,
     setBalance,

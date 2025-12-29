@@ -58,7 +58,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 import { useProductStore } from '@/stores/productStore'
@@ -104,6 +104,14 @@ function handleSearch() {
   loadProducts()
 }
 
+// 监听搜索关键词变化，当清空时自动重置
+watch(searchKeyword, (newVal) => {
+  if (newVal === '') {
+    currentPage.value = 1
+    loadProducts()
+  }
+})
+
 // 分页改变
 function handlePageChange() {
   loadProducts()
@@ -138,6 +146,7 @@ onMounted(() => {
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
   border-radius: 12px;
 }
+
 
 .loading-container {
   padding: 40px 0;

@@ -46,9 +46,9 @@ const userStore = useUserStore()
 const userMenus = [
   { index: '/', label: '首页' },
   { index: '/transactions', label: '交易记录' },
-  { index: '/rewards', label: '我的奖励' },
+  // { index: '/rewards', label: '我的奖励' },
   { index: '/reviews',label: '我的评论' },
-  { index: '/account', label: '我的账户' }
+  // { index: '/account', label: '我的账户' }
 
 ]
 

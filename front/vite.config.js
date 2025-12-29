@@ -24,7 +24,7 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api/, '/api'),
         configure: (proxy, options) => {
           proxy.on('error', (err, req, res) => {
-            console.log('后端服务未启动，请确保后端运行在 http://localhost:3000')
+            console.log('后端服务未启动，请确保后端运行在 http://localhost:8080')
           })
         }
       }

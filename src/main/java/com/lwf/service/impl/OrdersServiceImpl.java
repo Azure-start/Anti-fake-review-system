@@ -40,7 +40,7 @@ public class OrdersServiceImpl extends ServiceImpl<OrdersMapper, Orders> impleme
             throw new BusinessException("商品不存在");
         }
 
-        if (!"approved".equals(product.getStatus())) {
+        if (!"onSale".equals(product.getStatus())) {
             throw new BusinessException("商品未上架");
         }
 
@@ -190,7 +190,7 @@ public class OrdersServiceImpl extends ServiceImpl<OrdersMapper, Orders> impleme
             Products product = productsService.getById(order.getProductId());
             if (product != null) {
                 // 由于订单表中没有数量字段，默认每个订单增加1个销量
-                product.setSales(product.getSales() + 1);
+                product.setSales(product.getSales());
                 productsService.updateById(product);
             }
         }

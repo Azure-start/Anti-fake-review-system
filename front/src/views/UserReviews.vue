@@ -5,7 +5,7 @@
         <div v-loading="loading">
           <el-table :data="reviews" stripe>
             <el-table-column prop="productName" label="商品" />
-            <el-table-column prop="rating" label="评分" width="120">
+            <el-table-column prop="rating" label="评分" width="150">
               <template #default="{ row }">
                 <el-rate v-model="row.rating" disabled />
               </template>

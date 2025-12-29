@@ -150,4 +150,44 @@ public class OrdersController {
             return Result.error(e.getMessage());
         }
     }
+
+    /**
+     * 获取订单详情接口
+     *
+     * @param orderId 订单ID
+     * @return 返回操作结果，包含订单详细信息
+     */
+    @GetMapping("/orders/{orderId}")
+    public Result<Map<String, Object>> getOrderDetail(@PathVariable String orderId) {
+        try {
+            Map<String, Object> result = ordersService.getOrderDetail(orderId);
+            return Result.success(result);
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 更新订单交易哈希接口
+     *
+     * @param orderId 订单ID
+     * @param request 包含交易哈希的请求体
+     * @return 返回操作结果，包含更新后的订单信息
+     */
+    @PutMapping("/orders/{orderId}/tx-hash")
+    public Result<Map<String, Object>> updateOrderTxHash(
+            @PathVariable String orderId,
+            @RequestBody Map<String, String> request) {
+        try {
+            String txHash = request.get("txHash");
+            if (txHash == null) {
+                return Result.error("交易哈希不能为空");
+            }
+            Map<String, Object> result = ordersService.updateOrderTxHash(orderId, txHash);
+            return Result.success(result);
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
 }

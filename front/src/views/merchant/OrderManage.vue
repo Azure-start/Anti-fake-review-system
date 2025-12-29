@@ -5,13 +5,13 @@
         <div class="search-form">
           <el-form :inline="true" :model="searchParams" class="demo-form-inline">
             <el-form-item label="订单号">
-              <el-input v-model="searchParams.orderId" placeholder="输入订单号" clearable></el-input>
+              <el-input v-model="searchParams.orderId" placeholder="输入订单号" clearable style="width: 200px;"></el-input>
             </el-form-item>
             <el-form-item label="商品名称">
-              <el-input v-model="searchParams.productName" placeholder="输入商品名称" clearable></el-input>
+              <el-input v-model="searchParams.productName" placeholder="输入商品名称" clearable style="width: 200px;"></el-input>
             </el-form-item>
             <el-form-item label="买家地址">
-              <el-input v-model="searchParams.customerAddress" placeholder="输入买家地址" clearable></el-input>
+              <el-input v-model="searchParams.customerAddress" placeholder="输入买家地址" clearable style="width: 200px;"></el-input>
             </el-form-item>
             <el-form-item label="状态">
               <el-select v-model="searchParams.status" placeholder="选择状态" clearable style="width: 120px;">

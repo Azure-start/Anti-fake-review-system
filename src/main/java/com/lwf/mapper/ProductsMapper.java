@@ -11,6 +11,7 @@ import java.util.Map;
 @Mapper
 public interface ProductsMapper extends BaseMapper<Products> {
 
+
     // 商品搜索查询
     List<Products> selectProductList(ProductQueryDTO query);
 
@@ -35,4 +36,7 @@ public interface ProductsMapper extends BaseMapper<Products> {
 
     // 获取商品统计信息
     Map<String, Object> selectProductStats();
+
+    //根据商品ID获取商品详情（包含店铺名称）
+    Products getProductById(Long productId);
 }

@@ -18,6 +18,10 @@
         <result column="status" property="status" />
         <result column="created_at" property="createdAt" />
         <result column="updated_at" property="updatedAt" />
+
+        <!-- 商家信息映射 -->
+        <result column="shop_name" property="shopName"/>
+
     </resultMap>
 
     <!-- 通用查询结果列 -->
@@ -112,6 +116,16 @@
             SUM(sales) as total_sales,
             AVG(rating) as avg_rating
         FROM products
+    </select>
+
+    <!--根据商品ID获取商品详情（包含店铺名称）-->
+    <select id="getProductById" resultMap="BaseResultMap">
+        SELECT
+            p.*,
+            u.shop_name
+        FROM products p
+                 INNER JOIN users u ON p.merchant_id = u.id
+        WHERE p.id = #{productId}
     </select>
 
 </mapper>

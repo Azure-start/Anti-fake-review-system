@@ -13,6 +13,19 @@ request.interceptors.request.use(
   (config) => {
     const userStore = useUserStore()
     
+    // 检查token是否过期
+    if (userStore.token && userStore.isTokenExpired(userStore.token)) {
+      console.log('检测到Token已过期，执行登出')
+      ElMessage.warning('登录已过期，请重新登录')
+      userStore.logout()
+      
+      // 创建特殊错误，标记为token过期
+      const error = new Error('Token已过期')
+      error.code = 'TOKEN_EXPIRED'
+      error.isTokenExpired = true
+      return Promise.reject(error)
+    }
+    
     // 添加token到请求头（开发模式下可选）
     if (userStore.token) {
       config.headers.Authorization = `Bearer ${userStore.token}`
@@ -57,6 +70,12 @@ request.interceptors.response.use(
     return data
   },
   (error) => {
+    // 如果是token过期导致的错误，只有请求拦截器的提示，不显示其他错误
+    if (error.isTokenExpired || error.code === 'TOKEN_EXPIRED') {
+      console.log('Token过期错误已在请求拦截器处理，不显示额外错误')
+      return Promise.reject(error)
+    }
+    
     console.error('响应错误:', error)
     
     if (error.response) {

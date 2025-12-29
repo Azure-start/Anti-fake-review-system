@@ -12,6 +12,7 @@ import com.lwf.mapper.ProductsMapper;
 import com.lwf.mapper.OrdersMapper;
 import com.lwf.service.NonceService;
 import com.lwf.utils.BusinessException;
+import com.lwf.utils.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -57,7 +58,7 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users> implements
             user = new Users();
             user.setAddress(loginDTO.getAddress());
             user.setRole("user");
-            user.setDisplayName("用户_" + loginDTO.getAddress().substring(0, 8));
+            user.setDisplayName("用户" + loginDTO.getAddress().substring(0, 8));
             user.setReputationScore(10);
             user.setBalance(BigDecimal.ZERO);
             user.setTotalReviews(0);
@@ -66,7 +67,8 @@ public class UsersServiceImpl extends ServiceImpl<UsersMapper, Users> implements
         }
 
         // 生成简单token（实际应该用JWT）
-        String token = "token_" + System.currentTimeMillis() + "_" + user.getId();
+//        String token = "token_" + System.currentTimeMillis() + "_" + user.getId();
+        String token = JwtUtil.generateToken(user.getId(), user.getAddress(), user.getRole());
 
         result.put("code", 0);
         result.put("token", token);
