@@ -92,9 +92,6 @@ public class ProductsController {
  */
     @PostMapping("/merchant/products")
     public Result<Map<String, Object>> createProduct(@RequestBody Products product) {
-
-        System.out.println(product);
-
         try {
         // 调用productsService的createProduct方法创建商品，并将返回结果存储在result中
             Map<String, Object> result = productsService.createProduct(product);
@@ -115,93 +112,12 @@ public class ProductsController {
  */
     @GetMapping("/merchant/products")
     public Result<Map<String, Object>> getMerchantProducts(
-            @RequestParam String merchantAddress,
-            @RequestParam(defaultValue = "1") Integer page,
-            @RequestParam(defaultValue = "10") Integer pageSize,
-            @RequestParam(required = false) String productName,
-            @RequestParam(required = false) String status,
-            @RequestParam(required = false) String startTime,
-            @RequestParam(required = false) String endTime) {
+            @RequestParam String merchantAddress,  // 商户地址参数
+            @RequestParam(defaultValue = "1") Integer page,  // 页码参数，默认值为1
+            @RequestParam(defaultValue = "10") Integer pageSize) {  // 每页数量参数，默认值为10
         try {
-            Map<String, Object> result = productsService.getMerchantProducts(
-                    merchantAddress, page, pageSize, productName, status, startTime, endTime);
-            return Result.success(result);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
-    }
-
-/**
- * 更新商品信息的接口
- * @param productId 商品ID，用于标识要更新的商品
- * @param product 包含更新后商品信息的请求体，映射到Products对象
- * @return 返回更新结果或错误信息
- */
-    @PutMapping("/merchant/products/{productId}")
-    public Result<Map<String, Object>> updateProduct(
-            @PathVariable Long productId,  // 商品ID路径参数
-            @RequestBody Products product) {  // 包含更新信息的请求体
-        try {
-        // 调用服务层更新商品信息
-            Map<String, Object> result = productsService.updateProduct(productId, product);
-        // 返回成功结果
-            return Result.success(result);
-        } catch (Exception e) {
-        // 异常处理，返回错误信息
-            return Result.error(e.getMessage());
-        }
-    }
-
-/**
- * 商品下架接口
- * @param productId 商品ID，用于标识要下架的商品
- * @return 返回下架结果或错误信息
- */
-    @PutMapping("/merchant/products/off/{productId}")
-    public Result<Map<String, Object>> offShelfProduct(
-            @PathVariable Long productId) {  // 商品ID路径参数
-        try {
-        // 调用服务层下架商品
-            Map<String, Object> result = productsService.offShelfProduct(productId);
-        // 返回成功结果
-            return Result.success(result);
-        } catch (Exception e) {
-        // 异常处理，返回错误信息
-            return Result.error(e.getMessage());
-        }
-    }
-
-
-    /**
-     * 商品上架接口
-     * @param productId 商品ID，用于标识要上架的商品
-     * @return 返回上架结果或错误信息
-     */
-    @PutMapping("/merchant/products/on/{productId}")
-    public Result<Map<String, Object>> onSaleProduct(
-            @PathVariable Long productId) {  // 商品ID路径参数
-        try {
-            // 调用服务层上架商品
-            Map<String, Object> result = productsService.onSaleProduct(productId);
-            // 返回成功结果
-            return Result.success(result);
-        } catch (Exception e) {
-            // 异常处理，返回错误信息
-            return Result.error(e.getMessage());
-        }
-    }
-
-/**
- * 删除商品的接口
- * @param productId 商品ID，用于标识要删除的商品
- * @return 返回删除结果或错误信息
- */
-    @DeleteMapping("/merchant/products/{productId}")
-    public Result<Map<String, Object>> deleteProduct(
-            @PathVariable Long productId) {  // 商品ID路径参数
-        try {
-        // 调用服务层删除商品信息
-            Map<String, Object> result = productsService.deleteProduct(productId);
+        // 调用服务层获取商户商品列表
+            Map<String, Object> result = productsService.getMerchantProducts(merchantAddress, page, pageSize);
         // 返回成功结果
             return Result.success(result);
         } catch (Exception e) {

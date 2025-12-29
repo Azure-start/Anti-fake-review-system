@@ -30,7 +30,7 @@ async function loadStats() {
   try {
     const result = await getSystemStats()
     if (result.code === 0) {
-      const data = result
+      const data = result.data
       stats.value = [
         { title: '总用户数', value: data.totalUsers || 0 },
         { title: '总商家数', value: data.totalMerchants || 0 },
