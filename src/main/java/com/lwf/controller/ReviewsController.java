@@ -46,7 +46,6 @@ public class ReviewsController {
     public Result<Map<String, Object>> submitReview(@Validated @RequestBody ReviewDTO reviewDTO,
             @RequestHeader(value = "Authorization", required = false) String authorization) {
         try {
-            // 从JWT token中获取用户地址，如果token不存在则使用请求体中的地址（开发模式）
             String userAddress;
             if (authorization != null && !authorization.isEmpty()) {
                 userAddress = JwtUtil.getAddressFromToken(authorization);

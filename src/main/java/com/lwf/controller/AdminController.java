@@ -72,20 +72,20 @@ public class AdminController {
      * @param request 包含操作类型的请求体
      * @return 返回审核结果
      */
-    @PutMapping("/shop-applications/{applicationId}/audit")
-    public Result<Map<String, Object>> auditShopApplication(
-            @PathVariable Long applicationId,
-            @RequestBody Map<String, String> request) {
+    @PutMapping("/shop-applications/{applicationId}/audit")  // 定义PUT请求路径，用于处理店铺申请审核
+    public Result<Map<String, Object>> auditShopApplication(  // 方法定义，返回包含审核结果的Map
+            @PathVariable Long applicationId,  // 从路径变量中获取店铺申请ID
+            @RequestBody Map<String, String> request) {  // 从请求体中获取包含操作类型的Map
         try {
-            String action = request.get("action");
+            String action = request.get("action");  // 从请求中获取操作类型
             // 检查操作类型是否有效
-            if (action == null || (!"approve".equals(action) && !"reject".equals(action))) {
-                return Result.error("无效的操作类型");
+            if (action == null || (!"approve".equals(action) && !"reject".equals(action))) {  // 验证操作类型是否为"approve"或"reject"
+                return Result.error("无效的操作类型");  // 如果操作类型无效，返回错误信息
             }
-            Map<String, Object> result = usersService.auditShopApplication(applicationId, action);
-            return Result.success(result);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
+            Map<String, Object> result = usersService.auditShopApplication(applicationId, action);  // 调用服务层方法处理审核逻辑
+            return Result.success(result);  // 返回成功结果，包含审核处理后的数据
+        } catch (Exception e) {  // 捕获处理过程中可能出现的异常
+            return Result.error(e.getMessage());  // 返回错误信息，包含异常的具体描述
         }
     }
 

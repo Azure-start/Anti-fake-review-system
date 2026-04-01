@@ -63,8 +63,7 @@ const merchantMenus = [
 const adminMenus = [
   { index: '/admin/dashboard', label: '系统概览' },
   { index: '/admin/users', label: '用户管理' },
-  { index: '/admin/shop-audit', label: '商家审核' },
-  { index: '/admin/product-audit', label: '商品审核' }
+  { index: '/admin/shop-audit', label: '商家审核' }
 ]
 
 const menus = computed(() => {

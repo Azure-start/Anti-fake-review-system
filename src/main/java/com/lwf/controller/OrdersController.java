@@ -25,6 +25,7 @@ public class OrdersController {
 
     /**
      * 创建订单接口
+     * 
      * @param orderDTO 订单数据传输对象，包含创建订单所需的信息
      * @return 返回操作结果，包含订单创建后的相关信息
      */
@@ -40,9 +41,10 @@ public class OrdersController {
 
     /**
      * 获取用户订单列表接口
+     * 
      * @param userAddress 用户地址
-     * @param page 页码，默认为1
-     * @param pageSize 每页大小，默认为10
+     * @param page        页码，默认为1
+     * @param pageSize    每页大小，默认为10
      * @return 返回操作结果，包含用户订单列表信息
      */
     @GetMapping("/orders/user")
@@ -60,9 +62,10 @@ public class OrdersController {
 
     /**
      * 获取商家订单列表接口
+     * 
      * @param merchantId 商家ID
-     * @param page 页码，默认为1
-     * @param pageSize 每页大小，默认为10
+     * @param page       页码，默认为1
+     * @param pageSize   每页大小，默认为10
      * @return 返回操作结果，包含商家订单列表信息
      */
     @GetMapping("/orders/merchant")
@@ -80,6 +83,7 @@ public class OrdersController {
 
     /**
      * 更新订单状态接口
+     * 
      * @param orderId 订单ID
      * @param request 包含状态信息的请求体
      * @return 返回操作结果，包含更新后的订单信息
@@ -102,7 +106,8 @@ public class OrdersController {
 
     /**
      * 确认收货接口
-     * @param orderId 订单ID
+     * 
+     * @param orderId     订单ID
      * @param userAddress 用户地址
      * @return 返回操作结果，包含确认收货后的订单信息
      */
@@ -117,34 +122,40 @@ public class OrdersController {
             return Result.error(e.getMessage());
         }
     }
-    
+
     /**
-     * 获取商家订单列表接口（用于商家管理页面）
-     * @param merchantAddress 商家地址
-     * @param page 页码，默认为1
-     * @param pageSize 每页大小，默认为10
-     * @param orderId 订单号
-     * @param productName 商品名称
-     * @param customerAddress 买家地址
-     * @param status 订单状态
-     * @param startTime 开始时间
-     * @param endTime 结束时间
-     * @return 返回操作结果，包含商家订单列表信息
+     * 获取订单详情接口
+     * 
+     * @param orderId 订单ID
+     * @return 返回操作结果，包含订单详细信息
      */
-    @GetMapping("/merchant/orders")
-    public Result<Map<String, Object>> getShopOrders(
-            @RequestParam String merchantAddress,
-            @RequestParam(defaultValue = "1") Integer page,
-            @RequestParam(defaultValue = "10") Integer pageSize,
-            @RequestParam(required = false) String orderId,
-            @RequestParam(required = false) String productName,
-            @RequestParam(required = false) String customerAddress,
-            @RequestParam(required = false) String status,
-            @RequestParam(required = false) String startTime,
-            @RequestParam(required = false) String endTime) {
+    @GetMapping("/orders/{orderId}")
+    public Result<Map<String, Object>> getOrderDetail(@PathVariable String orderId) {
         try {
-            Map<String, Object> result = ordersService.getMerchantOrdersByAddress(
-                    merchantAddress, page, pageSize, orderId, productName, customerAddress, status, startTime, endTime);
+            Map<String, Object> result = ordersService.getOrderDetail(orderId);
+            return Result.success(result);
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 更新订单交易哈希接口
+     * 
+     * @param orderId 订单ID
+     * @param request 包含交易哈希的请求体
+     * @return 返回操作结果，包含更新后的订单信息
+     */
+    @PutMapping("/orders/{orderId}/tx-hash")
+    public Result<Map<String, Object>> updateOrderTxHash(
+            @PathVariable String orderId,
+            @RequestBody Map<String, String> request) {
+        try {
+            String txHash = request.get("txHash");
+            if (txHash == null) {
+                return Result.error("交易哈希不能为空");
+            }
+            Map<String, Object> result = ordersService.updateOrderTxHash(orderId, txHash);
             return Result.success(result);
         } catch (Exception e) {
             return Result.error(e.getMessage());
